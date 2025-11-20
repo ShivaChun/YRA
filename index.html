@@ -19,67 +19,9 @@
         const db = getFirestore(app);
         const appId = window.__app_id || 'default-app';
         
-        // Auth & Data Loading
-        let projects = [];
-        let siteTexts = {};
-
-        // 初始硬編碼資料 (用於種子數據)
-        const initialProjects = [
-             {
-                id: "0",
-                title: "House.C",
-                type: "Single Family Residence",
-                location: "Nantou, Taiwan",
-                year: "2020",
-                designBy: "@yroom.tw",
-                photography: "@cch.tw",
-                tag: "YE/RI",
-                image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop",
-                images: [
-                    "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop",
-                    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1000&auto=format&fit=crop",
-                    "https://images.unsplash.com/photo-1600607687644-c7171b42498b?q=80&w=1000&auto=format&fit=crop"
-                ],
-                description: "結廬在人境，而無車馬喧<br>-東晉 陶潛 《飲酒詩　其五》<br><br>居所，這座漂浮在時間河流中的孤島..."
-            },
-            {
-                id: "1",
-                title: "Quiet Light House",
-                type: "Apartment Renovation",
-                location: "Taipei, Taiwan",
-                year: "2021",
-                designBy: "@yroom.tw",
-                photography: "@cch.tw",
-                tag: "Y/ROOM",
-                image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop",
-                images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"],
-                description: "光是空間的詩。<br><br>在台北這座繁忙的城市中，我們試圖為居住者尋找一抹純淨的光..."
-            },
-             { id: "2", title: "Forest Villa", type: "Vacation Home", location: "Yilan", year: "2019", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1600596542815-205db241b054?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1600596542815-205db241b054?q=80&w=1000&auto=format&fit=crop"], description: "森之呼吸。" },
-             { id: "3", title: "Urban Loft", type: "Residential", location: "Taichung", year: "2022", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=80&w=1000&auto=format&fit=crop"], description: "垂直生活的想像。" },
-             { id: "4", title: "Gray Scale", type: "Office", location: "Hsinchu", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop"], description: "理性的灰階。" },
-             { id: "5", title: "The Courtyard", type: "Single Family", location: "Tainan", year: "2023", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1523217582562-09d0def993a6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1523217582562-09d0def993a6?q=80&w=1000&auto=format&fit=crop"], description: "內向的宇宙。" },
-             { id: "6", title: "Tea House", type: "Commercial", location: "Kyoto", year: "2018", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1522771753035-1a5b6562f3ba?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1522771753035-1a5b6562f3ba?q=80&w=1000&auto=format&fit=crop"], description: "一期一會。" },
-             { id: "7", title: "Concrete Flow", type: "Gallery", location: "Kaohsiung", year: "2022", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1518005052360-2037c3758ce2?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1518005052360-2037c3758ce2?q=80&w=1000&auto=format&fit=crop"], description: "凝固的流動。" },
-             { id: "8", title: "Mountain Retreat", type: "Hospitality", location: "Miaoli", year: "2020", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1449844908441-8829872d2607?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1449844908441-8829872d2607?q=80&w=1000&auto=format&fit=crop"], description: "山居歲月。" },
-             { id: "9", title: "White Cube", type: "Studio", location: "Taipei", year: "2023", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1000&auto=format&fit=crop"], description: "純粹的容器。" },
-             { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
-        ];
-
-        const initialTexts = {
-            "hero-title-cn": "肇於意，成於形",
-            "hero-subtitle-cn": "FROM VISION TO FORM",
-            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
-            "philo-title-cn": "{ / }",
-            "philo-subtitle-cn": "在分界之間，找到自由。",
-            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
-            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。"
-        };
-
         // Init Function
         async function init() {
             try {
-                // Check for initial auth token and use it if available
                 if (window.__initial_auth_token) {
                     await signInWithCustomToken(auth, window.__initial_auth_token);
                 } else {
@@ -87,33 +29,37 @@
                 }
             } catch (error) {
                 console.error("Authentication Error:", error);
-                return;
+                // Fallback to static data if auth fails
+                return; 
             }
 
-            // Ensure we have a user before proceeding
-            if (!auth.currentUser) {
-                console.error("No authenticated user.");
-                return;
-            }
+            if (!auth.currentUser) return;
             
             // 1. Projects Listener
             const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
             onSnapshot(projectsRef, async (snapshot) => {
                 if (snapshot.empty) {
-                    // Seed Data if empty
-                    console.log("Seeding initial data...");
-                    for(let p of initialProjects) {
-                        await setDoc(doc(projectsRef, p.id), p);
+                    // Seed Data using the global initialProjects if DB is empty
+                    if(window.initialProjects) {
+                        console.log("Seeding initial data...");
+                        for(let p of window.initialProjects) {
+                            await setDoc(doc(projectsRef, p.id), p);
+                        }
                     }
                 } else {
-                    projects = snapshot.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
-                    window.projectsData = projects; // Expose to global
-                    // If we are on "All Projects" overlay, re-render
-                    if(document.getElementById('all-projects-overlay').classList.contains('open')) {
+                    // Update global data with DB data
+                    const dbProjects = snapshot.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
+                    window.projectsData = dbProjects; 
+                    
+                    // Refresh Views
+                    if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+                    if(window.refreshAdminProjects) window.refreshAdminProjects();
+                    
+                    // If "All Projects" overlay is open, refresh it
+                    const overlay = document.getElementById('all-projects-overlay');
+                    if(overlay && overlay.classList.contains('open') && window.openAllProjects) {
                         window.openAllProjects(); 
                     }
-                    // Update main page projects
-                    renderFrontendProjects(projects);
                 }
             }, (err) => console.error("Projects sync error", err));
 
@@ -121,28 +67,28 @@
             const textsRef = collection(db, 'artifacts', appId, 'public', 'data', 'site_texts');
             onSnapshot(textsRef, async (snapshot) => {
                 if (snapshot.empty) {
-                    // Seed Texts
-                    for(let [key, val] of Object.entries(initialTexts)) {
-                        await setDoc(doc(textsRef, key), { content: val });
+                    if(window.initialTexts) {
+                        for(let [key, val] of Object.entries(window.initialTexts)) {
+                            await setDoc(doc(textsRef, key), { content: val });
+                        }
                     }
                 } else {
-                    snapshot.docs.forEach(d => {
-                        siteTexts[d.id] = d.data().content;
-                    });
-                    window.siteTexts = siteTexts; // Expose
-                    renderTexts();
+                    const dbTexts = {};
+                    snapshot.docs.forEach(d => { dbTexts[d.id] = d.data().content; });
+                    window.siteTexts = dbTexts;
+                    if(window.renderTexts) window.renderTexts();
+                    if(window.refreshAdminTexts) window.refreshAdminTexts();
                 }
             }, (err) => console.error("Texts sync error", err));
         }
 
         init();
 
-        // Global functions for Admin interaction
+        // Global functions for Admin interaction (Exposed to Window)
         window.saveProject = async (projectData) => {
             const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
             await setDoc(doc(projectsRef, projectData.id), projectData);
             alert("作品已儲存！");
-            window.refreshAdminProjects();
         };
 
         window.deleteProject = async (id) => {
@@ -150,7 +96,6 @@
                 const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
                 await deleteDoc(doc(projectsRef, id));
                 alert("作品已刪除");
-                window.refreshAdminProjects();
             }
         };
 
@@ -159,7 +104,6 @@
              await setDoc(doc(textsRef, key), { content: content });
              alert("文字已更新！");
         };
-
     </script>
 
     <script>
@@ -327,6 +271,7 @@
                     <a href="#contact-en" class="text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Contact /</a>
                 </nav>
                 <div class="flex gap-4 items-center border-l border-gray-300 pl-4 lg:pl-6">
+                    <!-- Social Icons -->
                     <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-400 hover:text-yr-red transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
                     <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-400 hover:text-yr-red transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
                 </div>
@@ -364,8 +309,8 @@
         <div onclick="closeAllProjects()" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
         <div class="w-full px-[4vw] py-[10vh]">
             <h2 class="text-fluid-xl font-light tracking-widest text-yr-black mb-12 text-center">ALL PROJECTS</h2>
-            <!-- Modified Grid Gap for Mobile -->
-            <div id="projects-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-[3vw] gap-y-10 md:gap-y-[5vh]"></div>
+            <!-- Responsive Grid: 1 col on mobile, 2 on tablet, 3 on desktop. Larger Y gap for mobile -->
+            <div id="projects-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-[3vw] gap-y-16 md:gap-y-[5vh]"></div>
         </div>
     </div>
 
@@ -431,7 +376,8 @@
                         <button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button>
                     </div>
                     <!-- Main Page Preview -->
-                    <div id="featured-projects-cn" class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-[4vw]">
+                    <!-- Updated Grid: Larger Gap for mobile -->
+                    <div id="featured-projects-cn" class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-[4vw]">
                         <!-- Injected by JS -->
                     </div>
                 </div>
@@ -563,7 +509,65 @@
         </div>
     </div>
 
+    <!-- Main Script - Moved Initial Data Here -->
     <script>
+        // --- Initial Data for Immediate Render ---
+        window.initialProjects = [
+             {
+                id: "0",
+                title: "House.C",
+                type: "Single Family Residence",
+                location: "Nantou, Taiwan",
+                year: "2020",
+                designBy: "@yroom.tw",
+                photography: "@cch.tw",
+                tag: "YE/RI",
+                image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop",
+                images: [
+                    "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop",
+                    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w=1000&auto=format&fit=crop",
+                    "https://images.unsplash.com/photo-1600607687644-c7171b42498b?q=80&w=1000&auto=format&fit=crop"
+                ],
+                description: "結廬在人境，而無車馬喧<br>-東晉 陶潛 《飲酒詩　其五》<br><br>居所，這座漂浮在時間河流中的孤島..."
+            },
+            {
+                id: "1",
+                title: "Quiet Light House",
+                type: "Apartment Renovation",
+                location: "Taipei, Taiwan",
+                year: "2021",
+                designBy: "@yroom.tw",
+                photography: "@cch.tw",
+                tag: "Y/ROOM",
+                image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop",
+                images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"],
+                description: "光是空間的詩。<br><br>在台北這座繁忙的城市中，我們試圖為居住者尋找一抹純淨的光..."
+            },
+             { id: "2", title: "Forest Villa", type: "Vacation Home", location: "Yilan", year: "2019", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1600596542815-205db241b054?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1600596542815-205db241b054?q=80&w=1000&auto=format&fit=crop"], description: "森之呼吸。" },
+             { id: "3", title: "Urban Loft", type: "Residential", location: "Taichung", year: "2022", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1507089947368-19c1da9775ae?q=80&w=1000&auto=format&fit=crop"], description: "垂直生活的想像。" },
+             { id: "4", title: "Gray Scale", type: "Office", location: "Hsinchu", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1000&auto=format&fit=crop"], description: "理性的灰階。" },
+             { id: "5", title: "The Courtyard", type: "Single Family", location: "Tainan", year: "2023", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1523217582562-09d0def993a6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1523217582562-09d0def993a6?q=80&w=1000&auto=format&fit=crop"], description: "內向的宇宙。" },
+             { id: "6", title: "Tea House", type: "Commercial", location: "Kyoto", year: "2018", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1522771753035-1a5b6562f3ba?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1522771753035-1a5b6562f3ba?q=80&w=1000&auto=format&fit=crop"], description: "一期一會。" },
+             { id: "7", title: "Concrete Flow", type: "Gallery", location: "Kaohsiung", year: "2022", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1518005052360-2037c3758ce2?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1518005052360-2037c3758ce2?q=80&w=1000&auto=format&fit=crop"], description: "凝固的流動。" },
+             { id: "8", title: "Mountain Retreat", type: "Hospitality", location: "Miaoli", year: "2020", designBy: "@yroom", photography: "@cch", tag: "YE/RI", image: "https://images.unsplash.com/photo-1449844908441-8829872d2607?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1449844908441-8829872d2607?q=80&w=1000&auto=format&fit=crop"], description: "山居歲月。" },
+             { id: "9", title: "White Cube", type: "Studio", location: "Taipei", year: "2023", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=1000&auto=format&fit=crop"], description: "純粹的容器。" },
+             { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
+        ];
+
+        window.initialTexts = {
+            "hero-title-cn": "肇於意，成於形",
+            "hero-subtitle-cn": "FROM VISION TO FORM",
+            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
+            "philo-title-cn": "{ / }",
+            "philo-subtitle-cn": "在分界之間，找到自由。",
+            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
+            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。"
+        };
+        
+        // Assign immediately to prevent blank flash
+        window.projectsData = window.initialProjects;
+        window.siteTexts = window.initialTexts;
+
         // --- Core Logic ---
         let currentLang = 'cn';
 
@@ -576,6 +580,7 @@
                 document.getElementById('main-content').classList.remove('hidden');
                 switchLanguage(lang);
                 checkScroll();
+                // Ensure projects are rendered when entering
                 if(window.projectsData) renderFrontendProjects(window.projectsData);
             }, 800);
         }
@@ -644,7 +649,8 @@
         };
 
         // Updated Project Render Function with Better Mobile Layout
-        function renderFrontendProjects(data) {
+        window.renderFrontendProjects = (data) => {
+            if(!data) return;
             const realProjects = data.filter(p => !p.isComingSoon);
             const previewProjects = realProjects.slice(0, 2);
             const cnContainer = document.getElementById('featured-projects-cn');
@@ -666,7 +672,7 @@
 
             if(cnContainer) cnContainer.innerHTML = previewProjects.map(createCard).join('');
             if(enContainer) enContainer.innerHTML = previewProjects.map(createCard).join('');
-        }
+        };
 
         // --- Overlays Logic ---
 
@@ -891,6 +897,8 @@
 
         window.closeEditModal = () => document.getElementById('edit-project-modal').classList.remove('active');
 
+        // Initial Render Trigger
+        if(window.initialProjects) window.renderFrontendProjects(window.initialProjects);
     </script>
 </body>
 </html>

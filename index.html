@@ -2,10 +2,9 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <!-- 使用 viewport-fit=cover 確保填滿全螢幕，並禁止使用者縮放以免破壞佈局 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <!-- 使用 viewport-fit=cover 確保填滿全螢幕，針對手機瀏海屏優化 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Y/R/A  | 逸離建築/韻室設計</title>
-    
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -28,19 +27,14 @@
                     spacing: {
                         '128': '32rem',
                     },
-                    // 優化後的流體文字大小 (基於視窗寬度 vw)
-                    // 修改重點：提高了第一個參數(最小值)，確保手機端(720p寬度約360px-400px)字體夠大
+                    // 自定義流體文字大小 (基於視窗寬度 vw) - 針對手機微調最小值
                     fontSize: {
-                        // 手機最小 13px，隨螢幕變大至 15px
-                        'fluid-xs': 'clamp(13px, 1vw, 15px)',   
-                        // 手機最小 15px，確保選單易讀
-                        'fluid-sm': 'clamp(15px, 1.2vw, 18px)',    
-                        // 內文標準字，手機 16px 起跳
-                        'fluid-base': 'clamp(16px, 1.5vw, 22px)', 
-                        // 標題
-                        'fluid-lg': 'clamp(18px, 2vw, 26px)',    
-                        'fluid-xl': 'clamp(24px, 3vw, 32px)',    
-                        'fluid-2xl': 'clamp(30px, 4vw, 48px)',   
+                        'fluid-xs': 'clamp(12px, 0.9vw, 15px)',    
+                        'fluid-sm': 'clamp(14px, 1.1vw, 18px)',    
+                        'fluid-base': 'clamp(16px, 1.4vw, 22px)', 
+                        'fluid-lg': 'clamp(20px, 1.8vw, 26px)',    
+                        'fluid-xl': 'clamp(24px, 2.5vw, 32px)',    
+                        'fluid-2xl': 'clamp(32px, 3.5vw, 48px)',  
                     }
                 }
             }
@@ -60,8 +54,7 @@
             color: #2E2E2E;
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
-            /* 優化觸控響應 */
-            touch-action: manipulation; 
+            touch-action: manipulation; /* 優化觸控 */
         }
 
         /* 隱藏內容 (用於語言切換) */
@@ -80,6 +73,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.8s ease-in-out;
+            z-index: -1;
         }
         .portal-fade-in {
             opacity: 1;
@@ -121,19 +115,22 @@
              100% { opacity: 0.15; }
         }
 
-        /* === 需求 2 修改: Portal 字母群組連動互動 === */
-        /* 增加一個 container 的 hover 效果 */
-        .portal-title-group {
-            cursor: default;
-        }
+        /* =========================================
+           需求 1 & 2: Portal 字母統一互動修改
+           ========================================= */
         
-        .portal-letter {
-            display: inline-block;
-            transition: transform 0.4s ease, color 0.4s ease;
+        /* 父容器定義為 interactive area */
+        .portal-interactive-area {
+            cursor: pointer; /* 讓使用者知道這裡可以互動 */
         }
 
-        /* 當滑鼠懸浮在整個群組(group)上時，所有字母(letter)一起變化 */
-        .portal-title-group:hover .portal-letter {
+        .portal-letter {
+            display: inline-block;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
+        }
+
+        /* 當 hover 父容器時，所有子元素 .portal-letter 同時動作 */
+        .portal-interactive-area:hover .portal-letter {
             color: #B85742; /* yr-red */
             transform: translateY(-8px);
         }
@@ -144,21 +141,35 @@
             stroke-linecap: round;
             stroke-dasharray: 20; 
             stroke-dashoffset: 20;
-            animation: slashFlow 3s infinite ease-in-out;
-            transition: stroke 0.4s ease;
-        }
-
-        /* 當群組懸浮時，斜線也變色 */
-        .portal-title-group:hover .portal-slash-svg line {
-            stroke: #B85742;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
         
+        /* 當 hover 父容器時，所有子元素 SVG line 同時開始動畫 */
+        .portal-interactive-area:hover .portal-slash-svg line {
+            animation: slashFlow 2s infinite ease-in-out;
+            opacity: 1;
+        }
+        
+        /* 斜線動畫：延伸 -> 流動 -> 縮短 */
         @keyframes slashFlow {
-            0% { stroke-dashoffset: 20; opacity: 0; }
-            20% { opacity: 1; }
-            40% { stroke-dashoffset: 0; }
-            60% { stroke-dashoffset: 0; }
-            100% { stroke-dashoffset: -20; opacity: 0; }
+            0% {
+                stroke-dashoffset: 20; /* 隱藏 */
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+            }
+            40% {
+                stroke-dashoffset: 0; /* 完全顯示 */
+            }
+            60% {
+                stroke-dashoffset: 0; /* 停留 */
+            }
+            100% {
+                stroke-dashoffset: -20; /* 消失 */
+                opacity: 0;
+            }
         }
 
         /* Hero 標題懸浮動畫 */
@@ -174,7 +185,7 @@
         /* 架構 SVG 動畫類別 */
         .structure-svg-path {
             fill: none;
-            stroke-width: 50; 
+            stroke-width: 50; /* 根據 SVG viewBox 調整 */
             stroke-linecap: round;
             stroke-linejoin: round;
             stroke-dasharray: 5000;
@@ -225,54 +236,51 @@
             max-height: 0;
             opacity: 0;
             overflow: hidden;
-            transition: max-height 0.6s ease-out, opacity 0.6s ease-out;
+            transition: max-height 0.6s ease-out, opacity 0.6s ease-out, margin 0.6s ease;
         }
         .leader-reveal.show {
-            max-height: 400px; 
+            max-height: 400px; /* 增加高度容納手機版內容 */
             opacity: 1;
             margin-top: 1.5vh;
         }
 
-        /* === 需求 1 修改: 針對手機端的瀏覽優化 (Mobile Optimized) === */
-        /* 針對寬度小於 768px 的裝置 (手機/平板直式) */
-        @media (max-width: 768px) {
-            /* 手機端導航列優化：改為可橫向滑動，避免字體過大造成換行破版 */
-            .mobile-scroll-nav {
-                display: flex !important; /* 強制顯示 */
-                overflow-x: auto;
-                white-space: nowrap;
-                -webkit-overflow-scrolling: touch; /* iOS 滑動慣性 */
-                padding-bottom: 10px; /* 預留滑動條空間(雖然通常隱藏) */
-                margin-left: -1rem; /* 抵消部分 margin 讓滑動感更滿版 */
-                width: 100vw;
-                padding-right: 5vw;
-                /* 隱藏 Scrollbar */
-                scrollbar-width: none; 
-                -ms-overflow-style: none;
-            }
-            .mobile-scroll-nav::-webkit-scrollbar {
-                display: none;
-            }
+        /* Mobile Menu Styles */
+        #mobile-menu-overlay {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(100%);
+        }
+        #mobile-menu-overlay.open {
+            transform: translateX(0);
+        }
 
-            /* 強制手機連結字體大小與觸控範圍 */
-            .mobile-link-touch {
-                font-size: 15px !important; /* 覆寫 fluid 設定，確保手機上夠大 */
-                padding: 12px 16px; /* 加大點擊範圍 */
-                display: inline-block;
-            }
+        /* Hamburger Icon Animation */
+        .hamburger-line {
+            transition: all 0.3s ease-in-out;
+            transform-origin: center;
+        }
+        .hamburger-active .line-1 {
+            transform: translateY(6px) rotate(45deg);
+        }
+        .hamburger-active .line-2 {
+            opacity: 0;
+        }
+        .hamburger-active .line-3 {
+            transform: translateY(-6px) rotate(-45deg);
+        }
 
-            /* 調整 Header 高度與間距，避免手指遮擋 */
-            #header {
-                padding-top: 1rem;
-                padding-bottom: 0.5rem;
-                background: rgba(245, 245, 245, 0.95); /* 手機端增加背景色防止文字重疊 */
-                backdrop-filter: blur(5px);
-            }
-
-            /* 調整內容區間距 */
-            section {
-                padding-left: 6vw !important;
-                padding-right: 6vw !important;
+        /* 針對超窄螢幕微調 & Mobile Padding */
+        :root {
+            --section-padding-x-mobile: 6vw; 
+            --section-padding-x-desktop: 4vw; 
+        }
+        .responsive-px {
+            padding-left: var(--section-padding-x-mobile);
+            padding-right: var(--section-padding-x-mobile);
+        }
+        @media (min-width: 768px) {
+            .responsive-px {
+                padding-left: var(--section-padding-x-desktop);
+                padding-right: var(--section-padding-x-desktop);
             }
         }
     </style>
@@ -280,9 +288,9 @@
 <body class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white overflow-x-hidden">
 
     <!-- ========== Portal (入口意象) ========== -->
-    <div id="portal" class="fixed inset-0 z-[100] bg-yr-white flex flex-col justify-center items-center overflow-hidden">
+    <div id="portal" class="fixed inset-0 z-[100] bg-yr-white flex flex-col justify-center items-center overflow-hidden transition-all duration-800">
         <!-- Big Logo -->
-        <div id="portal-logo-container" class="w-[40vw] h-[40vw] max-w-[250px] max-h-[250px] mb-12 text-yr-black">
+        <div id="portal-logo-container" class="w-[50vw] h-[50vw] md:w-[40vw] md:h-[40vw] max-w-[250px] max-h-[250px] mb-12 text-yr-black">
             <svg viewBox="37500 32600 2150 2100" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-2xl">
                 <g>
                     <polygon class="logo-fill" points="39589.06,32651.66 38610.11,32651.66 38610.11,33281.13 39129.42,33281.13 "/>
@@ -295,9 +303,8 @@
             </svg>
         </div>
 
-        <!-- 需求 2: 互動式標題修改 (群組連動) -->
-        <!-- 新增 portal-title-group 類別在父層 -->
-        <div class="portal-title-group flex items-center justify-center gap-[1vw] text-fluid-xl tracking-[0.2em] font-light mb-2 text-center h-[40px]">
+        <!-- 需求 2: 互動式標題 - 修改為整個區域一起互動 -->
+        <div class="portal-interactive-area flex items-center justify-center gap-[1vw] text-fluid-xl tracking-[0.2em] font-light mb-2 text-center h-[50px] px-4">
             <span class="portal-letter">Y</span>
             <!-- 動態 SVG 斜線 -->
             <svg class="portal-slash-svg w-[20px] h-[30px]" viewBox="0 0 10 20">
@@ -311,76 +318,56 @@
             <span class="portal-letter">A</span>
         </div>
 
-        <p class="text-fluid-xs text-gray-400 tracking-[0.4em] mb-16 pointer-events-none text-center mt-4">FROM VISION TO FORM.</p>
+        <p class="text-fluid-xs text-gray-400 tracking-[0.4em] mb-16 pointer-events-none text-center">FROM VISION TO FORM.</p>
 
         <div class="flex space-x-8 md:space-x-12 text-fluid-base tracking-widest font-light z-10">
-            <!-- 加大手機點擊範圍的 padding -->
-            <button onclick="enterSite('cn')" class="mobile-link-touch hover:text-yr-red transition-colors duration-300 border-b border-transparent hover:border-yr-red">中文</button>
-            <span class="text-gray-300 font-light py-2">/</span>
-            <button onclick="enterSite('en')" class="mobile-link-touch hover:text-yr-red transition-colors duration-300 border-b border-transparent hover:border-yr-red">EN</button>
+            <button onclick="enterSite('cn')" class="hover:text-yr-red transition-colors duration-300 py-2 px-4 border-b border-transparent hover:border-yr-red">中文</button>
+            <span class="text-gray-300 font-light">/</span>
+            <button onclick="enterSite('en')" class="hover:text-yr-red transition-colors duration-300 py-2 px-4 border-b border-transparent hover:border-yr-red">EN</button>
         </div>
     </div>
 
     <!-- ========== Navigation (Fixed) ========== -->
-    <header id="header" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500 py-4 md:py-6 opacity-0">
-        <div class="w-full px-[4vw] flex justify-between items-center md:flex-row flex-col md:gap-0 gap-2">
-            <!-- Logo Area -->
-            <div class="w-full md:w-auto flex justify-between items-center">
-                <a href="javascript:void(0)" onclick="backToPortal()" class="flex items-center gap-2 md:gap-3 group z-50 relative cursor-pointer">
-                    <svg viewBox="37500 32600 2150 2100" xmlns="http://www.w3.org/2000/svg" class="w-[6vw] h-[6vw] max-w-[30px] max-h-[30px] text-yr-black group-hover:text-yr-red transition-colors">
-                        <g>
-                            <polyline fill="none" stroke="currentColor" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" points="37571.88,32652.13 38610.09,33551.24 38610.09,34648.31 "/>
-                            <polyline fill="none" stroke="currentColor" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" points="38610.11,32651.66 39589.06,32651.66 38934.65,33551.37 39284.08,33853.87 "/>
-                        </g>
-                    </svg>
-                    <span class="text-fluid-base font-bold tracking-widest group-hover:text-yr-red transition-colors whitespace-nowrap">Y / R / A /</span>
-                </a>
-                
-                <!-- 手機版 Social Icons (移到上方以便操作) -->
-                <div class="flex md:hidden gap-4 items-center border-l border-gray-300 pl-4">
-                    <a href="https://www.facebook.com/yroom.tc" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-yr-red">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                        </svg>
-                    </a>
-                    <a href="https://www.instagram.com/yroom.tw/" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-yr-red">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                        </svg>
-                    </a>
-                </div>
-            </div>
+    <header id="header" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500 py-4 md:py-6 opacity-0 pointer-events-none">
+        <div class="w-full responsive-px flex justify-between items-center">
+            <!-- Logo -->
+            <a href="javascript:void(0)" onclick="backToPortal()" class="flex items-center gap-2 md:gap-3 group z-50 relative cursor-pointer">
+                <svg viewBox="37500 32600 2150 2100" xmlns="http://www.w3.org/2000/svg" class="w-[8vw] h-[8vw] md:w-[40px] md:h-[40px] max-w-[40px] max-h-[40px] text-yr-black group-hover:text-yr-red transition-colors">
+                    <g>
+                        <polyline fill="none" stroke="currentColor" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" points="37571.88,32652.13 38610.09,33551.24 38610.09,34648.31 "/>
+                        <polyline fill="none" stroke="currentColor" stroke-width="100" stroke-linecap="round" stroke-linejoin="round" points="38610.11,32651.66 39589.06,32651.66 38934.65,33551.37 39284.08,33853.87 "/>
+                    </g>
+                </svg>
+                <span class="text-fluid-base font-bold tracking-widest group-hover:text-yr-red transition-colors whitespace-nowrap">Y / R / A /</span>
+            </a>
 
-            <div class="flex items-center w-full md:w-auto">
-                <!-- Desktop Menu (CN) + Mobile Scroll Optimized -->
-                <!-- 增加 mobile-scroll-nav class 處理手機橫向滑動 -->
-                <nav id="nav-cn" class="flex gap-4 md:gap-10 lang-nav hidden items-center mr-0 md:mr-10 w-full md:w-auto mobile-scroll-nav">
-                    <!-- 增加 mobile-link-touch class 強制手機字體與Padding -->
-                    <a href="#philosophy-cn" class="mobile-link-touch text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 底蘊 /</a>
-                    <a href="#structure-cn" class="mobile-link-touch text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 架構 /</a>
-                    <a href="#projects-cn" class="mobile-link-touch text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 作品 /</a>
-                    <a href="#contact-cn" class="mobile-link-touch text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 聯繫 /</a>
+            <!-- Desktop Menu (Hidden on Mobile) -->
+            <div class="hidden md:flex items-center">
+                <!-- CN Menu -->
+                <nav id="nav-cn" class="flex gap-10 lang-nav hidden items-center mr-10">
+                    <a href="#philosophy-cn" class="text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 底蘊 /</a>
+                    <a href="#structure-cn" class="text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 架構 /</a>
+                    <a href="#projects-cn" class="text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 作品 /</a>
+                    <a href="#contact-cn" class="text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red link-underline whitespace-nowrap">/ 聯繫 /</a>
                 </nav>
                 
-                 <!-- Desktop Menu (EN) + Mobile Scroll Optimized -->
-                 <nav id="nav-en" class="flex gap-4 md:gap-10 lang-nav hidden items-center mr-0 md:mr-10 w-full md:w-auto mobile-scroll-nav">
-                    <a href="#philosophy-en" class="mobile-link-touch text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Philosophy /</a>
-                    <a href="#structure-en" class="mobile-link-touch text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Structure /</a>
-                    <a href="#projects-en" class="mobile-link-touch text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Projects /</a>
-                    <a href="#contact-en" class="mobile-link-touch text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Contact /</a>
+                <!-- EN Menu -->
+                <nav id="nav-en" class="flex gap-10 lang-nav hidden items-center mr-10">
+                    <a href="#philosophy-en" class="text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Philosophy /</a>
+                    <a href="#structure-en" class="text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Structure /</a>
+                    <a href="#projects-en" class="text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Projects /</a>
+                    <a href="#contact-en" class="text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase link-underline whitespace-nowrap">/ Contact /</a>
                 </nav>
 
-                <!-- Desktop Social Links (Hidden on Mobile to save space for menu) -->
-                <div class="hidden md:flex gap-4 items-center border-l border-gray-300 pl-6">
+                <!-- Social Links -->
+                <div class="flex gap-4 items-center border-l border-gray-300 pl-6">
                     <a href="https://www.facebook.com/yroom.tc" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-yr-red transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[4vw] h-[4vw] max-w-[20px] max-h-[20px]">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[20px] h-[20px]">
                             <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                         </svg>
                     </a>
                     <a href="https://www.instagram.com/yroom.tw/" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-yr-red transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[4vw] h-[4vw] max-w-[20px] max-h-[20px]">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-[20px] h-[20px]">
                             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                             <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                             <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
@@ -388,16 +375,43 @@
                     </a>
                 </div>
             </div>
+
+            <!-- Hamburger Button (Mobile Only) -->
+            <button id="hamburger-btn" class="md:hidden z-[60] text-yr-black p-2 focus:outline-none" onclick="toggleMobileMenu()">
+                <div class="w-6 h-6 flex flex-col justify-around items-center relative">
+                    <span class="w-full h-[2px] bg-current line-1 hamburger-line"></span>
+                    <span class="w-full h-[2px] bg-current line-2 hamburger-line"></span>
+                    <span class="w-full h-[2px] bg-current line-3 hamburger-line"></span>
+                </div>
+            </button>
         </div>
     </header>
 
-    <main id="main-content" class="bg-grid-pattern min-h-screen pt-0">
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu-overlay" class="fixed inset-0 bg-yr-white z-[55] flex flex-col justify-center items-center md:hidden">
+        <div id="mobile-nav-content" class="flex flex-col gap-8 text-center">
+            <!-- 這裡的連結會由 JS 根據語言動態填入 -->
+        </div>
+        
+        <!-- Mobile Socials -->
+         <div class="flex gap-6 items-center mt-12 pt-8 border-t border-gray-200 w-[40%] justify-center">
+            <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-400 hover:text-yr-red">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+            </a>
+            <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-400 hover:text-yr-red">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            </a>
+        </div>
+    </div>
+
+    <main id="main-content" class="bg-grid-pattern min-h-screen pt-0 hidden">
         
         <!-- ==================== CHINESE CONTENT (CN) ==================== -->
         <div id="content-cn" class="lang-section">
             
             <!-- 1. Hero Section -->
-            <section id="hero-cn" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
+            <!-- 手機優化：確保文字在 9:16 比例下不溢出，調整 px -->
+            <section id="hero-cn" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-4 md:px-6">
                 <div class="animate-on-scroll">
                     <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-6 hero-float">肇於意，成於形</h2>
                     <p class="text-fluid-sm text-yr-red tracking-[0.3em] font-medium mb-8">FROM VISION TO FORM</p>
@@ -405,30 +419,33 @@
                 </div>
                 
                 <!-- Brand Intro -->
-                <div class="absolute bottom-[12vh] w-full px-[5vw] md:px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;">
+                <div class="absolute bottom-[10vh] w-full responsive-px text-center animate-on-scroll" style="transition-delay: 0.3s;">
                     <p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center">
-                        YR ATELIER (Y.R.A.)  <span class="text-yr-black font-medium"> 一個跨領域設計品牌。<br>
-                        它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>
+                        YR ATELIER (Y.R.A.)  <span class="text-yr-black font-medium"> 一個跨領域設計品牌。<br class="hidden md:block">
+                        它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br class="hidden md:block">
                         在秩序與自由、形與留白、光與影之間尋找平衡。
                     </p>
                 </div>
             </section>
 
             <!-- 2. Philosophy -->
-            <section id="philosophy-cn" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
-                <div class="w-full flex flex-col md:flex-row gap-[4vw]">
-                    <div class="w-full md:w-1/3 animate-on-scroll text-left mb-8 md:mb-0">
+            <!-- 手機優化：flex-col (直排) -> md:flex-row (橫排) -->
+            <section id="philosophy-cn" class="py-[10vh] responsive-px bg-white border-t border-gray-100 scroll-mt-20">
+                <div class="w-full flex flex-col md:flex-row gap-8 md:gap-[4vw]">
+                    <!-- Title -->
+                    <div class="w-full md:w-1/3 animate-on-scroll text-left">
                         <h2 class="text-fluid-lg font-bold text-yr-red tracking-[0.2em] mb-4">品牌哲學</h2>
                         <h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug">{ / }<br><span class="text-fluid-sm text-gray-400">在分界之間，找到自由。</span></h3>
                     </div>
-                    <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-[6vw] md:gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
+                    <!-- Content -->
+                    <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
                         <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify">
                             <p class="mb-6">
                                 「 / 」是一個分界符號，也是一種意識狀態。
                                 一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。
                             </p>
                         </div>
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l-0 md:border-l border-gray-100 pl-0 md:pl-[2vw]">
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l-2 md:border-l border-gray-100 pl-4 md:pl-[2vw]">
                             <p class="mb-6">
                                 「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。
                                 建築與室內的界線，是我們思考的起點。
@@ -439,16 +456,17 @@
             </section>
 
             <!-- 3. Structure -->
-            <section id="structure-cn" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
+            <section id="structure-cn" class="py-[10vh] responsive-px bg-yr-white scroll-mt-20">
                 <div class="w-full animate-on-scroll">
                     <div class="text-center mb-[5vh]">
                         <h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2>
                     </div>
 
-                    <!-- 手機版改為垂直排列，桌機版維持水平 -->
-                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-6 md:gap-0">
+                    <!-- 手機優化：改為 flex-col 上下堆疊，取消中間垂直線 -->
+                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-8 md:gap-0">
+                        
                         <!-- Left Wing: Architecture -->
-                        <div onclick="toggleLeader('arch', 'cn')" class="flex-1 bg-white p-[4vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-lg md:rounded-none">
+                        <div onclick="toggleLeader('arch', 'cn')" class="flex-1 bg-white p-8 md:p-[2vw] md:py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-sm">
                             <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">逸離建築</h3>
                             <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p>
                             <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
@@ -457,9 +475,9 @@
                             
                             <!-- 子分頁顯示區 A -->
                             <div id="leader-arch-cn" class="leader-reveal flex flex-col items-center justify-center">
-                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4 mt-4"></div>
+                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4"></div>
                                 <p class="text-fluid-base text-yr-black font-medium tracking-widest mb-4">主持人 陳嘉君</p>
-                                <div class="w-[60px] h-[60px]">
+                                <div class="w-[40px] h-[40px]">
                                     <svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-gray-400">
                                         <g>
                                             <polygon class="structure-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/>
@@ -472,13 +490,13 @@
                             </div>
                         </div>
 
-                        <!-- Center Stem (Hidden on Mobile) -->
+                        <!-- Center Stem (只在 Desktop 顯示) -->
                         <div class="hidden md:flex flex-col justify-center items-center px-[2vw]">
                             <div class="w-[1px] h-full bg-gray-300"></div>
                         </div>
 
                         <!-- Right Wing: Interior -->
-                        <div onclick="toggleLeader('interior', 'cn')" class="flex-1 bg-white p-[4vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-lg md:rounded-none">
+                        <div onclick="toggleLeader('interior', 'cn')" class="flex-1 bg-white p-8 md:p-[2vw] md:py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-sm">
                             <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">韻室設計</h3>
                             <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p>
                             <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
@@ -487,9 +505,9 @@
 
                             <!-- 子分頁顯示區 B -->
                             <div id="leader-interior-cn" class="leader-reveal flex flex-col items-center justify-center">
-                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4 mt-4"></div>
+                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4"></div>
                                 <p class="text-fluid-base text-yr-black font-medium tracking-widest mb-4">總監 趙韻蓉</p>
-                                <div class="w-[60px] h-[60px]">
+                                <div class="w-[40px] h-[40px]">
                                     <svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-gray-400">
                                         <g>
                                             <polyline class="structure-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/>
@@ -505,20 +523,21 @@
 
              <!-- 4. Projects Preview -->
              <section id="projects-cn" class="py-[10vh] bg-white scroll-mt-20">
-                <div class="w-full px-[4vw]">
+                <div class="w-full responsive-px">
                     <div class="flex justify-between items-end mb-[5vh] animate-on-scroll">
                         <div>
                             <h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2>
                         </div>
-                        <a href="#" class="mobile-link-touch text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap">查看全部</a>
+                        <a href="#" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap">查看全部</a>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-[6vw] md:gap-[4vw]">
+                    <!-- 手機優化：grid-cols-1 (單欄) -> md:grid-cols-2 (雙欄) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-[4vw]">
                         <!-- Project 1 -->
                         <div class="group cursor-pointer animate-on-scroll">
                             <div class="aspect-[4/3] bg-gray-100 overflow-hidden relative">
                                 <img src="https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop" alt="Architecture Project" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
-                                <div class="absolute top-4 left-4 bg-yr-black text-white text-[12px] px-3 py-1 tracking-widest">逸離建築</div>
+                                <div class="absolute top-4 left-4 bg-yr-black text-white text-[10px] px-2 py-1 tracking-widest">逸離建築</div>
                             </div>
                             <div class="mt-[2vh]">
                                 <h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">HOUSE.C</h3>
@@ -530,7 +549,7 @@
                         <div class="group cursor-pointer animate-on-scroll" style="transition-delay: 0.2s;">
                             <div class="aspect-[4/3] bg-gray-100 overflow-hidden relative">
                                 <img src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop" alt="Interior Project" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
-                                <div class="absolute top-4 left-4 bg-gray-200 text-yr-black text-[12px] px-3 py-1 tracking-widest">韻室設計</div>
+                                <div class="absolute top-4 left-4 bg-gray-200 text-yr-black text-[10px] px-2 py-1 tracking-widest">韻室設計</div>
                             </div>
                             <div class="mt-[2vh]">
                                 <h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">靜謐光宅</h3>
@@ -542,15 +561,15 @@
              </section>
 
             <!-- 5. Contact (CN) -->
-            <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
+            <section id="contact-cn" class="py-[15vh] responsive-px text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
                 <div class="w-full animate-on-scroll">
                     <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2>
                     <h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3>
-                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[5vh] text-fluid-sm">
-                        我們相信空間的核心，不在於區隔，而在於連結。<br>
+                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">
+                        我們相信空間的核心，不在於區隔，而在於連結。<br class="hidden md:block">
                         在理性與詩性之間，尋找思想的留白。
                     </p>
-                    <a href="mailto:reccadna@gmail.com" class="mobile-link-touch inline-block bg-yr-red text-white px-[6vw] md:px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300">
+                    <a href="mailto:reccadna@gmail.com" class="inline-block bg-yr-red text-white px-8 py-3 md:px-[3vw] md:py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300">
                         開始對話
                     </a>
                 </div>
@@ -561,44 +580,37 @@
         <div id="content-en" class="lang-section">
             
             <!-- 1. Hero Section -->
-            <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
+            <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-4 md:px-6">
                 <div class="animate-on-scroll">
-                    <!-- English Hero Animation -->
                     <p class="text-fluid-base text-yr-red tracking-[0.3em] uppercase font-medium mb-8 hero-float">FROM VISION TO FORM.</p>
                     <div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div>
                 </div>
                 
-                <div class="absolute bottom-[12vh] w-full px-[5vw] md:px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;">
+                <div class="absolute bottom-[10vh] w-full responsive-px text-center animate-on-scroll" style="transition-delay: 0.3s;">
                     <p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center">
                         YR ATELIER (Y.R.A.) <br>
-                        <span class="text-yr-black font-medium">A multidisciplinary design brand.  
-                            It is not merely a practice integrating architecture 
-            and interior design, but a mindset－<br>
-                            seeking equilibrium between order and freedom, 
-                            form and void, light and stillness.
-
+                        <span class="text-yr-black font-medium">A multidisciplinary design brand.<br class="hidden md:block">
+                        It is not merely a practice integrating architecture and interior design, but a mindset－<br class="hidden md:block">
+                        seeking equilibrium between order and freedom, form and void, light and stillness.
                     </p>
                 </div>
             </section>
 
             <!-- 2. Philosophy -->
-            <section id="philosophy-en" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
-                <div class="w-full flex flex-col md:flex-row gap-[4vw]">
-                    <div class="w-full md:w-1/3 animate-on-scroll text-left mb-8 md:mb-0">
-                        <h2 class="text-fluid-base font-bold text-yr-red tracking-[0.2em] mb-4">BRAND 
-                                                                                PRINCIPLE</h2>
+            <section id="philosophy-en" class="py-[10vh] responsive-px bg-white border-t border-gray-100 scroll-mt-20">
+                <div class="w-full flex flex-col md:flex-row gap-8 md:gap-[4vw]">
+                    <div class="w-full md:w-1/3 animate-on-scroll text-left">
+                        <h2 class="text-fluid-base font-bold text-yr-red tracking-[0.2em] mb-4 uppercase">Brand Principle</h2>
                         <h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug">{/}<br><span class="text-fluid-xs text-gray-400">Clarity and Calm.</span></h3>
                     </div>
-                    <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-[6vw] md:gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
+                    <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
                         <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify">
                             <p class="mb-6">
-                                「 / 」 
-                                 is a symbol of threshold and a state of awareness.
-                                 The slash "/" between them is not a divide, 
-                                 but a path of flow.
+                                「 / 」 is a symbol of threshold and a state of awareness.
+                                The slash "/" between them is not a divide, but a path of flow.
                             </p>
                         </div>
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l-0 md:border-l border-gray-100 pl-0 md:pl-[2vw]">
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l-2 md:border-l border-gray-100 pl-4 md:pl-[2vw]">
                             <p class="mb-6">
                                 “FROM VISION TO FORM”—we pursue that fleeting moment of inspiration.
                             </p>
@@ -608,30 +620,32 @@
             </section>
 
             <!-- 3. Structure -->
-            <section id="structure-en" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
+            <section id="structure-en" class="py-[10vh] responsive-px bg-yr-white scroll-mt-20">
                 <div class="w-full animate-on-scroll">
                     <div class="text-center mb-[5vh]">
                         <h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Structure</h2>
                         <p class="text-fluid-xs text-gray-400 tracking-[0.2em] mt-2">BRAND ARCHITECTURE</p>
                     </div>
 
-                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-6 md:gap-0">
+                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-8 md:gap-0">
                         <!-- Left Wing -->
-                        <div onclick="toggleLeader('arch', 'en')" class="flex-1 bg-white p-[4vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-lg md:rounded-none">
-                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">YE/RI ARCHITECTES.</h3>
+                        <div onclick="toggleLeader('arch', 'en')" class="flex-1 bg-white p-8 md:p-[2vw] md:py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-sm">
+                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">YE/RI ARCHITECTS.</h3>
                             <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh] mt-[3vh]"></div>
                             <p class="text-fluid-xs text-gray-600 font-light tracking-wide">Architecture / Public Space</p>
                             <p class="mt-[3vh] text-fluid-xs text-yr-black font-bold tracking-[0.2em] uppercase">Beyond Form.</p>
                             
                             <!-- Sub-option Reveal -->
                             <div id="leader-arch-en" class="leader-reveal flex flex-col items-center justify-center">
-                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4 mt-4"></div>
+                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4"></div>
                                 <p class="text-fluid-base text-yr-black font-medium tracking-widest mb-4">Principal / CHEN, CHIA-CHUN</p>
-                                <div class="w-[60px] h-[60px]">
+                                <div class="w-[40px] h-[40px]">
                                     <svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-gray-400">
                                         <g>
                                             <polygon class="structure-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/>
                                             <polygon class="structure-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/>
+                                            <polygon class="structure-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/>
+                                            <polygon class="structure-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/>
                                         </g>
                                     </svg>
                                 </div>
@@ -644,17 +658,17 @@
                         </div>
 
                         <!-- Right Wing -->
-                        <div onclick="toggleLeader('interior', 'en')" class="flex-1 bg-white p-[4vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-lg md:rounded-none">
-                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">Y/ROOM DESIGN.</h3>
+                        <div onclick="toggleLeader('interior', 'en')" class="flex-1 bg-white p-8 md:p-[2vw] md:py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg rounded-sm">
+                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">Y/ROOM</h3>
                             <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh] mt-[3vh]"></div>
                             <p class="text-fluid-xs text-gray-600 font-light tracking-wide">Interior / Living</p>
-                            <p class="mt-[3vh] text-fluid-xs text-yr-black font-bold tracking-[0.2em] uppercase">Rhyme of Life.</p>
+                            <p class="mt-[3vh] text-fluid-xs text-yr-black font-bold tracking-[0.2em] uppercase">Rhythm of Life.</p>
 
-                             <!-- Sub-option Reveal -->
-                             <div id="leader-interior-en" class="leader-reveal flex flex-col items-center justify-center">
-                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4 mt-4"></div>
+                            <!-- Sub-option Reveal -->
+                            <div id="leader-interior-en" class="leader-reveal flex flex-col items-center justify-center">
+                                <div class="w-4 h-[1px] bg-yr-red mx-auto mb-4"></div>
                                 <p class="text-fluid-base text-yr-black font-medium tracking-widest mb-4">Director / CHAO, YUN-JUNG</p>
-                                <div class="w-[60px] h-[60px]">
+                                <div class="w-[40px] h-[40px]">
                                     <svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-gray-400">
                                         <g>
                                             <polyline class="structure-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/>
@@ -667,31 +681,39 @@
                     </div>
                 </div>
             </section>
-             <!-- 4. Projects (EN) -->
-             <section id="projects-en" class="py-[10vh] bg-white scroll-mt-20">
-                <div class="w-full px-[4vw]">
+
+            <!-- 4. Projects Preview -->
+            <section id="projects-en" class="py-[10vh] bg-white scroll-mt-20">
+                <div class="w-full responsive-px">
                     <div class="flex justify-between items-end mb-[5vh] animate-on-scroll">
                         <div>
-                            <h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Selected Works</h2>
+                            <h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Recent Work</h2>
                         </div>
-                        <a href="#" class="mobile-link-touch text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap">VIEW ALL</a>
+                        <a href="#" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap">VIEW ALL</a>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-[6vw] md:gap-[4vw]">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-[4vw]">
+                        <!-- Project 1 -->
                         <div class="group cursor-pointer animate-on-scroll">
                             <div class="aspect-[4/3] bg-gray-100 overflow-hidden relative">
-                                <img src="https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop" alt="Architecture" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
+                                <img src="https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop" alt="Architecture Project" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
+                                <div class="absolute top-4 left-4 bg-yr-black text-white text-[10px] px-2 py-1 tracking-widest">YE/RI</div>
                             </div>
                             <div class="mt-[2vh]">
                                 <h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">HOUSE.C</h3>
+                                <p class="text-fluid-xs text-gray-400 mt-1 tracking-wider">Architecture / Nantou</p>
                             </div>
                         </div>
+                        
+                        <!-- Project 2 -->
                         <div class="group cursor-pointer animate-on-scroll" style="transition-delay: 0.2s;">
                             <div class="aspect-[4/3] bg-gray-100 overflow-hidden relative">
-                                <img src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop" alt="Interior" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
+                                <img src="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop" alt="Interior Project" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 grayscale group-hover:grayscale-0">
+                                <div class="absolute top-4 left-4 bg-gray-200 text-yr-black text-[10px] px-2 py-1 tracking-widest">Y/ROOM</div>
                             </div>
                             <div class="mt-[2vh]">
-                                <h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">SILENT LIGHT</h3>
+                                <h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">CALM LIGHT</h3>
+                                <p class="text-fluid-xs text-gray-400 mt-1 tracking-wider">Interior / Taipei</p>
                             </div>
                         </div>
                     </div>
@@ -699,15 +721,15 @@
              </section>
 
             <!-- 5. Contact (EN) -->
-            <section id="contact-en" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
+            <section id="contact-en" class="py-[15vh] responsive-px text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
                 <div class="w-full animate-on-scroll">
-                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">FROM VISION TO FORM</h2>
-                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[5vh] text-fluid-sm">
-                        We believe the core of space lies not in division, but in connection.<br>
-                        Between reason and poetry, we find the void for thought.
+                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">From Vision to Form</h2>
+                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">
+                        We believe the core of space lies not in division, but in connection.<br class="hidden md:block">
+                        Seeking the void of thought between reason and poetry.
                     </p>
-                    <a href="mailto:reccadna@gmail.com" class="mobile-link-touch inline-block bg-yr-red text-white px-[6vw] md:px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300">
-                        START CONVERSATION
+                    <a href="mailto:reccadna@gmail.com" class="inline-block bg-yr-red text-white px-8 py-3 md:px-[3vw] md:py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300">
+                        START DIALOGUE
                     </a>
                 </div>
             </section>
@@ -715,88 +737,157 @@
 
     </main>
 
-    <!-- Script for Interactions -->
     <script>
-        // 語言切換邏輯
+        let currentLang = 'cn';
+
+        // 進入網站動畫
         function enterSite(lang) {
+            currentLang = lang;
+            
+            // Portal 淡出
             const portal = document.getElementById('portal');
+            portal.classList.add('portal-fade-out');
+
+            // 顯示 Header
             const header = document.getElementById('header');
-            const contentCn = document.getElementById('content-cn');
-            const contentEn = document.getElementById('content-en');
+            header.style.opacity = '1';
+            header.style.pointerEvents = 'auto';
+            
+            // 顯示 Main Content
+            const mainContent = document.getElementById('main-content');
+            mainContent.classList.remove('hidden');
+            
+            // 切換語言顯示
+            const cnSection = document.getElementById('content-cn');
+            const enSection = document.getElementById('content-en');
             const navCn = document.getElementById('nav-cn');
             const navEn = document.getElementById('nav-en');
 
-            // 淡出 Portal
-            portal.classList.add('portal-fade-out');
-            
-            // 顯示對應內容
-            setTimeout(() => {
-                portal.style.display = 'none';
-                header.style.opacity = '1';
-                
-                if (lang === 'cn') {
-                    contentCn.classList.add('active');
-                    navCn.classList.remove('hidden'); // 移除 hidden，配合 CSS 的 display: flex
-                    navEn.classList.add('hidden');
-                } else {
-                    contentEn.classList.add('active');
-                    navEn.classList.remove('hidden');
-                    navCn.classList.add('hidden');
-                }
+            if (lang === 'cn') {
+                cnSection.classList.add('active');
+                enSection.classList.remove('active');
+                navCn.classList.remove('hidden');
+                navEn.classList.add('hidden');
+                document.documentElement.lang = 'zh-Hant';
+            } else {
+                cnSection.classList.remove('active');
+                enSection.classList.add('active');
+                navCn.classList.add('hidden');
+                navEn.classList.remove('hidden');
+                document.documentElement.lang = 'en';
+            }
 
-                // 觸發滾動觀察器
-                observeScroll();
-            }, 800);
+            // 初始化 Scroll Observer
+            initObserver();
+
+            // 更新手機選單內容 (根據語言)
+            updateMobileMenuLinks();
         }
 
-        // 回到入口
+        // 返回入口 (Reset)
         function backToPortal() {
             const portal = document.getElementById('portal');
-            const header = document.getElementById('header');
-            const contentCn = document.getElementById('content-cn');
-            const contentEn = document.getElementById('content-en');
-            const navCn = document.getElementById('nav-cn');
-            const navEn = document.getElementById('nav-en');
-
-            header.style.opacity = '0';
-            contentCn.classList.remove('active');
-            contentEn.classList.remove('active');
-            
-            portal.style.display = 'flex';
-            // 強制 reflow 確保 transition
-            void portal.offsetWidth;
             portal.classList.remove('portal-fade-out');
             
-            setTimeout(() => {
-               navCn.classList.add('hidden');
-               navEn.classList.add('hidden');
-               // Reset leader reveals
-               document.querySelectorAll('.leader-reveal').forEach(el => el.classList.remove('show'));
-            }, 800);
+            const header = document.getElementById('header');
+            header.style.opacity = '0';
+            header.style.pointerEvents = 'none';
+
+            // 關閉所有展開的領導人資訊
+            document.querySelectorAll('.leader-reveal').forEach(el => {
+                el.classList.remove('show');
+            });
+            
+            // 關閉手機選單
+            closeMobileMenu();
+            
+            window.scrollTo(0,0);
         }
 
-        // Intersection Observer for Scroll Animations
-        function observeScroll() {
+        // 切換領導人資訊展開
+        function toggleLeader(type, lang) {
+            const id = `leader-${type}-${lang}`;
+            const element = document.getElementById(id);
+            
+            // 關閉同語言下其他的
+            const allInLang = document.querySelectorAll(`#content-${lang} .leader-reveal`);
+            allInLang.forEach(el => {
+                if(el.id !== id) el.classList.remove('show');
+            });
+
+            element.classList.toggle('show');
+        }
+
+        // Scroll Animation Observer
+        function initObserver() {
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         entry.target.classList.add('is-visible');
                     }
                 });
-            }, { threshold: 0.1 });
+            }, {
+                threshold: 0.1
+            });
 
             document.querySelectorAll('.animate-on-scroll').forEach((el) => {
                 observer.observe(el);
             });
         }
         
-        // Toggle Leader Info
-        function toggleLeader(type, lang) {
-            const id = `leader-${type}-${lang}`;
-            const el = document.getElementById(id);
-            if (el) {
-                el.classList.toggle('show');
+        // --- Mobile Menu Logic ---
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+        const mobileNavContent = document.getElementById('mobile-nav-content');
+        let isMenuOpen = false;
+
+        function toggleMobileMenu() {
+            isMenuOpen = !isMenuOpen;
+            
+            if(isMenuOpen) {
+                mobileMenuOverlay.classList.add('open');
+                hamburgerBtn.classList.add('hamburger-active');
+                document.body.style.overflow = 'hidden'; // 禁止背景滾動
+            } else {
+                closeMobileMenu();
             }
+        }
+
+        function closeMobileMenu() {
+            isMenuOpen = false;
+            mobileMenuOverlay.classList.remove('open');
+            hamburgerBtn.classList.remove('hamburger-active');
+            document.body.style.overflow = '';
+        }
+
+        // 生成手機選單連結
+        function updateMobileMenuLinks() {
+            mobileNavContent.innerHTML = ''; // 清空
+            
+            const linksCN = [
+                { text: '/ 底蘊 /', href: '#philosophy-cn' },
+                { text: '/ 架構 /', href: '#structure-cn' },
+                { text: '/ 作品 /', href: '#projects-cn' },
+                { text: '/ 聯繫 /', href: '#contact-cn' },
+            ];
+            
+            const linksEN = [
+                { text: '/ Philosophy /', href: '#philosophy-en' },
+                { text: '/ Structure /', href: '#structure-en' },
+                { text: '/ Projects /', href: '#projects-en' },
+                { text: '/ Contact /', href: '#contact-en' },
+            ];
+
+            const currentLinks = (currentLang === 'cn') ? linksCN : linksEN;
+
+            currentLinks.forEach(link => {
+                const a = document.createElement('a');
+                a.href = link.href;
+                a.textContent = link.text;
+                a.className = "text-xl font-light tracking-widest text-yr-black hover:text-yr-red transition-colors py-2";
+                a.onclick = closeMobileMenu; // 點擊後關閉選單
+                mobileNavContent.appendChild(a);
+            });
         }
     </script>
 </body>

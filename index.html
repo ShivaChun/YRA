@@ -39,8 +39,11 @@
         .portal-slash-svg line { stroke: #A0A0A0; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20; stroke-dashoffset: 20; animation: slashFlow 3s infinite ease-in-out; transition: stroke 0.3s ease; }
         .portal-interactive-group:hover .portal-slash-svg line { stroke: #B85742; }
         @keyframes slashFlow { 0% { stroke-dashoffset: 20; opacity: 0; } 20% { opacity: 1; } 40% { stroke-dashoffset: 0; } 60% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -20; opacity: 0; } }
+        
+        .hero-char { display: inline-block; transition: opacity 0.05s ease-in-out; position: relative; }
         .hero-float { animation: floating 4s ease-in-out infinite; }
         @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+
         .structure-svg-path { fill: none; stroke-width: 50; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 5000; stroke-dashoffset: 5000; animation: drawStructure 2s ease-out forwards; }
         .structure-svg-fill { fill: #F5F5F5; opacity: 0; animation: fillStructure 1s ease-out 1.5s forwards; }
         @keyframes drawStructure { to { stroke-dashoffset: 0; } }
@@ -71,10 +74,7 @@
         .dashboard-tab.active { border-bottom: 2px solid #B85742; color: #B85742; }
         .project-card:hover .project-img { transform: scale(1.05); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* FIX: Use relative positioning for details to allow height growth on mobile */
         .detail-content { position: relative; width: 100%; min-height: 100%; }
-        
         :root { --section-padding-x: 4vw; }
     </style>
 </head>
@@ -85,7 +85,7 @@
         const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100' fill='%23f5f5f5'%3E%3Crect width='100' height='100'/%3E%3Cpath d='M50 50a15 15 0 1 0 0-30 15 15 0 0 0 0 30zm0 8c-18 0-30 10-30 20v5h60v-5c0-10-12-20-30-20z' fill='%23cccccc'/%3E%3C/svg%3E";
 
         window.initialProjects = [
-             { id: "0", title: "House.C", type: "Single Family Residence", location: "Nantou, Taiwan", year: "2020", designBy: "@yroom.tw", photography: "@cch.tw", tag: "YE/RI", image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop"], description: "結廬在人境，而無車馬喧 <br> -東晉 陶潛 《飲酒詩　其五》<br> 居所，這座漂浮在時間河流中的孤島，是我們抵禦外界的堡壘，也是我們靈魂的棲息地。我們相信，一個量身打造的空間，不僅僅是磚瓦的堆砌，更是生活藝術的結晶。它就像是一座私人的煉金術工廠，將平凡的日常轉化為瑰麗的奇幻。 <br> " },
+             { id: "0", title: "House.C", type: "Single Family Residence", location: "Nantou, Taiwan", year: "2020", designBy: "@yroom.tw", photography: "@cch.tw", tag: "YE/RI", image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop"], description: "結廬在人境，而無車馬喧..." },
              { id: "1", title: "Quiet Light House", type: "Apartment", location: "Taipei", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"], description: "光是空間的詩。" },
              { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
         ];
@@ -93,24 +93,24 @@
         window.initialTexts = {
             "hero-title-cn": "肇於意，成於形",
             "hero-subtitle-cn": "FROM VISION TO FORM",
-            "hero-desc-cn": "YR ATELIER (Y.R.A.) <br> <span class='text-yr-black font-medium'> －個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，<br>更是一種思維方式<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
+            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
             "philo-title-cn": "{ / }",
             "philo-subtitle-cn": "在分界之間，找到自由。",
-            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。 <br> 一側代表向外的創造力與光； <br> 另一側則代表向內的覺知與靜度。 <br>",
-            "philo-text-2-cn": "「肇於意，成於形」- <br> 實現起心動念的那一瞬的靈光乍現，是我們思考的起點。",
+            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
+            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。",
             "hero-subtitle-en": "FROM VISION TO FORM.",
-            "hero-desc-en": "YR ATELIER (Y.R.A.) <br> <span class='text-yr-black font-medium'> A multidisciplinary design brand. <br>It is not merely a practice integrating architecture and interior design.</span>",
+            "hero-desc-en": "YR ATELIER (Y.R.A.) <br><span class='text-yr-black font-medium'>A multidisciplinary design brand. It is not merely a practice integrating architecture and interior design, but a mindset.</span>",
             "philo-title-en": "{ / }",
             "philo-subtitle-en": "Clarity and Calm.",
-            "philo-text-1-en": "「 / 」 is a symbol of threshold and a state of awareness. <br> The slash 「 / 」 between them is not a divide, but a path of flow. <br>",
-            "philo-text-2-en": "“FROM VISION TO FORM” —  <br> we pursue that fleeting moment of inspiration. ",
+            "philo-text-1-en": "「 / 」 is a symbol of threshold and a state of awareness. The slash \"/\" between them is not a divide, but a path of flow.",
+            "philo-text-2-en": "“FROM VISION TO FORM”—we pursue that fleeting moment of inspiration."
         };
 
         window.initialLeaders = {
             "arch": { name: "陳嘉君", title: "主持建築師", edu: "台灣科技大學建築系 碩士", exp: "韻室設計\nNelson Wilmotte Architectes\n劉培森建築師事務所\n陳章安建築師事務所", photo: placeholderImg },
             "room": { name: "趙韻蓉", title: "總監", edu: "台灣科技大學建築系 學士", exp: "韻室設計\n成舍設計\n長禾設計", photo: placeholderImg },
-            "arch_en": { name: "SHIVA CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects", photo: placeholderImg },
-            "room_en": { name: "JOAN CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design", photo: placeholderImg }
+            "arch_en": { name: "CHIA-CHUN CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects", photo: placeholderImg },
+            "room_en": { name: "YUN-JUNG CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design", photo: placeholderImg }
         };
         
         window.projectsData = window.initialProjects;
@@ -186,11 +186,50 @@
         }
         init();
 
-        window.saveProject = async (p) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); alert("Saved!"); };
-        window.deleteProject = async (id) => { if(confirm("Delete?")) { await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); alert("Deleted"); }};
-        window.saveSiteText = async (k, c) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); alert("Updated!"); };
-        window.saveLeader = async (key, data) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); alert("Leader Updated!"); };
-        window.submitContact = async (data) => { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() }); return true; } catch (e) { console.error(e); return false; } };
+        // Global SAVE functions
+        window.saveProject = async (p) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); 
+                alert("Saved Project!"); 
+                if(window.refreshAdminProjects) window.refreshAdminProjects();
+                if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+            } catch(e) { alert("Save Error: " + e.message); }
+        };
+        
+        window.deleteProject = async (id) => { 
+            if(confirm("Delete?")) { 
+                try {
+                    await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); 
+                    alert("Deleted"); 
+                } catch(e) { alert("Delete Error: " + e.message); }
+            }
+        };
+        
+        window.saveSiteText = async (k, c) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); 
+                alert("Updated Text!"); 
+                if(!window.siteTexts) window.siteTexts = {};
+                window.siteTexts[k] = c;
+                if(window.renderTexts) window.renderTexts();
+            } catch(e) { alert("Save Text Error: " + e.message); }
+        };
+        
+        window.saveLeader = async (key, data) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); 
+                alert("Leader Updated!"); 
+                if(!window.leadersData) window.leadersData = {};
+                window.leadersData[key] = data;
+            } catch(e) { alert("Save Leader Error: " + e.message); }
+        };
+        
+        window.submitContact = async (data) => { 
+            try { 
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() }); 
+                return true; 
+            } catch (e) { console.error(e); return false; } 
+        };
     </script>
 
     <!-- Portal -->
@@ -307,7 +346,14 @@
     <main id="main-content" class="bg-grid-pattern min-h-screen pt-0 flex-grow hidden">
         <div id="content-cn" class="lang-section">
             <section id="hero-cn" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
-                <div class="animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-6 hero-float" data-text-key="hero-title-cn">肇於意，成於形</h2><p class="text-fluid-sm text-yr-red tracking-[0.3em] font-medium mb-8" data-text-key="hero-subtitle-cn">FROM VISION TO FORM</p><div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div></div>
+                <div class="animate-on-scroll">
+                    <!-- Updated Hero: Neon Text Only -->
+                    <div class="hero-neon-container">
+                        <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-6 neon-text" data-text-key="hero-title-cn">肇於意，成於形</h2>
+                    </div>
+                    <p class="text-fluid-sm text-yr-red tracking-[0.3em] font-medium mb-8" data-text-key="hero-subtitle-cn">FROM VISION TO FORM</p>
+                    <div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div>
+                </div>
                 <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-cn">YR ATELIER (Y.R.A.) ...</p></div>
             </section>
             
@@ -357,22 +403,32 @@
                 <div class="w-full px-[4vw]">
                     <div class="flex justify-between items-end mb-[5vh] animate-on-scroll">
                         <div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2></div>
-                        <button onclick="openAllProjects()" class="text-fluid-sm font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button>
+                        <button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button>
                     </div>
                     <div id="featured-projects-cn" class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-[4vw]"></div>
                 </div>
             </section>
             <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
                 <div class="w-full animate-on-scroll">
-                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">肇於意，成於形</h2>
-                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>讓我們團隊幫您實現</p>
+                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2>
+                    <h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3>
+                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>在理性與詩性之間，尋找思想的留白。</p>
                     <button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">開始對話</button>
                 </div>
             </section>
         </div>
         
         <div id="content-en" class="lang-section">
-             <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6"><div class="animate-on-scroll"><p class="text-fluid-base text-yr-red tracking-[0.3em] uppercase font-medium mb-8 hero-float" data-text-key="hero-subtitle-en">FROM VISION TO FORM.</p><div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div></div><div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-en">YR ATELIER (Y.R.A.) ...</p></div></section>
+             <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
+                <div class="animate-on-scroll">
+                     <!-- Updated Hero: Neon Text Only -->
+                     <div class="hero-neon-container">
+                        <p class="text-fluid-base text-yr-red tracking-[0.3em] uppercase font-medium mb-8 hero-float neon-text" data-text-key="hero-subtitle-en">FROM VISION TO FORM.</p>
+                     </div>
+                    <div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div>
+                </div>
+                <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-en">YR ATELIER (Y.R.A.) ...</p></div>
+             </section>
              <section id="philosophy-en" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
                  <div class="w-full flex flex-col md:flex-row gap-[4vw]">
                     <div class="w-full md:w-1/3 animate-on-scroll text-left"><h2 class="text-fluid-base font-bold text-yr-red tracking-[0.2em] mb-4">BRAND PRINCIPLE</h2><h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug"><span data-text-key="philo-title-en">{/}<br></span><span class="text-fluid-xs text-gray-400" data-text-key="philo-subtitle-en">Clarity and Calm.</span></h3></div>
@@ -401,7 +457,7 @@
     <script>
         // --- Core ---
         let currentLang = 'cn';
-        function enterSite(lang) { currentLang = lang; document.getElementById('portal').classList.add('portal-fade-out'); setTimeout(() => { document.getElementById('portal').style.display = 'none'; document.getElementById('header').classList.remove('opacity-0', 'pointer-events-none'); document.getElementById('main-content').classList.remove('hidden'); switchLanguage(lang); checkScroll(); if(window.projectsData) renderFrontendProjects(window.projectsData); }, 800); }
+        function enterSite(lang) { currentLang = lang; document.getElementById('portal').classList.add('portal-fade-out'); setTimeout(() => { document.getElementById('portal').style.display = 'none'; document.getElementById('header').classList.remove('opacity-0', 'pointer-events-none'); document.getElementById('main-content').classList.remove('hidden'); switchLanguage(lang); checkScroll(); if(window.projectsData) renderFrontendProjects(window.projectsData); initGlitchEffect('hero-title-cn'); initGlitchEffect('hero-subtitle-en'); }, 800); }
         function backToPortal() { document.getElementById('mobile-menu').classList.remove('open'); closeAllProjects(); closeProjectDetail(); closeAdminDashboard(); restoreDefaultStructure(); document.getElementById('header').classList.add('opacity-0', 'pointer-events-none'); const portal = document.getElementById('portal'); portal.style.display = 'flex'; void portal.offsetWidth; portal.classList.remove('portal-fade-out'); setTimeout(() => { document.getElementById('main-content').classList.add('hidden'); window.scrollTo(0, 0); }, 500); }
         function switchLanguage(lang) { document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active')); document.getElementById(`content-${lang}`).classList.add('active'); document.querySelectorAll('.lang-nav').forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); }); const targetNav = document.getElementById(`nav-${lang}`); if (targetNav) { targetNav.classList.remove('hidden'); targetNav.classList.add('flex'); } document.getElementById('mobile-nav-cn').classList.add('hidden'); document.getElementById('mobile-nav-en').classList.add('hidden'); document.getElementById(`mobile-nav-${lang}`).classList.remove('hidden'); renderTexts(); if(window.projectsData) renderFrontendProjects(window.projectsData); }
         function toggleMobileMenu() { const menu = document.getElementById('mobile-menu'); const btn = document.getElementById('hamburger-btn'); menu.classList.toggle('open'); btn.classList.toggle('hamburger-active'); document.body.style.overflow = menu.classList.contains('open') ? 'hidden' : ''; }
@@ -409,7 +465,17 @@
         window.addEventListener('scroll', checkScroll);
 
         // --- Rendering ---
-        window.renderTexts = () => { const t = window.siteTexts || {}; document.querySelectorAll('[data-text-key]').forEach(el => { const k = el.getAttribute('data-text-key'); if(t[k]) el.innerHTML = t[k]; }); };
+        window.renderTexts = () => { 
+            const t = window.siteTexts || {}; 
+            document.querySelectorAll('[data-text-key]').forEach(el => { 
+                const k = el.getAttribute('data-text-key'); 
+                if(t[k]) el.innerHTML = t[k]; 
+            });
+            // Re-init glitch if texts updated
+            initGlitchEffect('hero-title-cn');
+            initGlitchEffect('hero-subtitle-en');
+        };
+
         window.renderFrontendProjects = (d) => { if(!d) return; const r = d.filter(p => !p.isComingSoon).slice(0, 2); const c1 = document.getElementById('featured-projects-cn'); const c2 = document.getElementById('featured-projects-en'); const h = (p) => `<div class="group cursor-pointer animate-on-scroll is-visible" onclick="openProjectDetail('${p.id}')"><div class="aspect-[4/3] bg-gray-100 overflow-hidden relative"><img src="${p.image}" class="w-full h-full object-cover transition-transform duration-700 grayscale-0 md:grayscale md:group-hover:grayscale-0"><div class="absolute top-4 left-4 bg-yr-black text-white text-[10px] px-2 py-1 tracking-widest">${p.tag}</div></div><div class="mt-[2vh]"><h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">${p.title}</h3><p class="text-fluid-xs text-gray-400 mt-1 tracking-wider">${p.type} / ${p.location}</p></div></div>`; if(c1) c1.innerHTML = r.map(h).join(''); if(c2) c2.innerHTML = r.map(h).join(''); };
 
         // --- Structure Interaction Logic ---
@@ -566,9 +632,57 @@
         document.addEventListener("DOMContentLoaded", function() {
             if (window.initialProjects) {
                 window.renderFrontendProjects(window.initialProjects);
-                window.renderTexts(); // Render texts if initialTexts are available
+                window.renderTexts(); 
+                
+                // NEW: Initialize Glitch Effect
+                initGlitchEffect('hero-title-cn');
+                initGlitchEffect('hero-subtitle-en');
             }
         });
+        
+        // NEW: Glitch Effect Logic
+        function initGlitchEffect(elementId) {
+            const el = document.querySelector(`[data-text-key="${elementId}"]`);
+            if(!el) return;
+            
+            const text = el.innerText;
+            // If already processed, don't redo unless text changed (simple check)
+            if(el.querySelector('.hero-char')) return;
+
+            const chars = text.split('').map(c => `<span class="hero-char inline-block transition-opacity duration-100 relative">${c === ' ' ? '&nbsp;' : c}</span>`).join('');
+            el.innerHTML = chars;
+            el.style.position = 'relative'; 
+
+            const spans = el.querySelectorAll('.hero-char');
+
+            function triggerGlitch() {
+                // 1. Random Flicker
+                const count = Math.floor(Math.random() * 3) + 1; // 1-3 chars
+                const indices = [];
+                for(let i=0; i<count; i++) indices.push(Math.floor(Math.random() * spans.length));
+
+                let steps = 0;
+                const maxSteps = 20; // Increased from 6 to 20 for longer duration
+                const interval = setInterval(() => {
+                    indices.forEach(idx => {
+                        const span = spans[idx];
+                        if(!span) return;
+                        // Slower/More random opacity for neon effect
+                        span.style.opacity = Math.random() > 0.3 ? '1' : '0.1';
+                    });
+                    steps++;
+                    if(steps >= maxSteps) {
+                        clearInterval(interval);
+                        indices.forEach(idx => { if(spans[idx]) spans[idx].style.opacity = '1'; });
+                    }
+                }, 100); // Increased from 80 to 100 for slightly slower flicker
+
+                // Next Glitch Interval
+                setTimeout(triggerGlitch, Math.random() * 4000 + 4000); 
+            }
+            
+            setTimeout(triggerGlitch, 2000);
+        }
     </script>
 </body>
 </html>

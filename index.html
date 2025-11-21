@@ -6,151 +6,6 @@
     <title>Y/R/A  | 逸離建築/韻室設計</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = window.__app_id || 'default-app';
-        
-        // Data Stores
-        let projects = [];
-        let siteTexts = {};
-        let leadersData = {};
-        let messagesData = [];
-
-        // Initial Seeds
-        window.initialProjects = [
-             { id: "0", title: "House.C", type: "Single Family Residence", location: "Nantou, Taiwan", year: "2020", designBy: "@yroom.tw", photography: "@cch.tw", tag: "YE/RI", image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop"], description: "結廬在人境，而無車馬喧..." },
-             { id: "1", title: "Quiet Light House", type: "Apartment", location: "Taipei", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"], description: "光是空間的詩。" },
-             { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
-        ];
-
-        // Updated to include English Texts
-        window.initialTexts = {
-            // CN
-            "hero-title-cn": "肇於意，成於形",
-            "hero-subtitle-cn": "FROM VISION TO FORM",
-            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
-            "philo-title-cn": "{ / }",
-            "philo-subtitle-cn": "在分界之間，找到自由。",
-            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
-            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。",
-            
-            // EN
-            "hero-subtitle-en": "FROM VISION TO FORM.",
-            "hero-desc-en": "YR ATELIER (Y.R.A.) <br><span class='text-yr-black font-medium'>A multidisciplinary design brand. It is not merely a practice integrating architecture and interior design, but a mindset.</span>",
-            "philo-title-en": "{ / }",
-            "philo-subtitle-en": "Clarity and Calm.",
-            "philo-text-1-en": "「 / 」 is a symbol of threshold and a state of awareness. The slash \"/\" between them is not a divide, but a path of flow.",
-            "philo-text-2-en": "“FROM VISION TO FORM”—we pursue that fleeting moment of inspiration."
-        };
-
-        const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100' fill='%23f5f5f5'%3E%3Crect width='100' height='100'/%3E%3Cpath d='M50 50a15 15 0 1 0 0-30 15 15 0 0 0 0 30zm0 8c-18 0-30 10-30 20v5h60v-5c0-10-12-20-30-20z' fill='%23cccccc'/%3E%3C/svg%3E";
-
-        window.initialLeaders = {
-            "arch": {
-                name: "陳嘉君",
-                title: "主持建築師",
-                edu: "台灣科技大學建築系 碩士",
-                exp: "韻室設計\nNelson Wilmotte Architectes\n劉培森建築師事務所\n陳章安建築師事務所",
-                photo: placeholderImg
-            },
-            "room": {
-                name: "趙韻蓉",
-                title: "總監",
-                edu: "台灣科技大學建築系 學士",
-                exp: "韻室設計\n成舍設計\n長禾設計",
-                photo: placeholderImg
-            },
-            "arch_en": {
-                name: "CHIA-CHUN CHEN",
-                title: "Lead Architect",
-                edu: "M.Arch, Taiwan Tech",
-                exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects",
-                photo: placeholderImg
-            },
-            "room_en": {
-                name: "YUN-JUNG CHAO",
-                title: "Director",
-                edu: "B.Arch, Taiwan Tech",
-                exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design",
-                photo: placeholderImg
-            }
-        };
-
-        async function init() {
-            try {
-                if (window.__initial_auth_token) await signInWithCustomToken(auth, window.__initial_auth_token);
-                else await signInAnonymously(auth);
-            } catch (error) { console.error("Auth Error", error); return; }
-
-            if (!auth.currentUser) return;
-            
-            // 1. Projects
-            const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
-            onSnapshot(projectsRef, async (s) => {
-                if (s.empty && window.initialProjects) {
-                    for(let p of window.initialProjects) await setDoc(doc(projectsRef, p.id), p);
-                } else {
-                    window.projectsData = s.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
-                    if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
-                    if(window.refreshAdminProjects) window.refreshAdminProjects();
-                }
-            });
-
-            // 2. Texts
-            const textsRef = collection(db, 'artifacts', appId, 'public', 'data', 'site_texts');
-            onSnapshot(textsRef, async (s) => {
-                if (s.empty && window.initialTexts) {
-                    for(let [k, v] of Object.entries(window.initialTexts)) await setDoc(doc(textsRef, k), { content: v });
-                } else {
-                    const t = {}; s.docs.forEach(d => t[d.id] = d.data().content);
-                    window.siteTexts = t;
-                    if(window.renderTexts) window.renderTexts();
-                    if(window.refreshAdminTexts) window.refreshAdminTexts();
-                }
-            });
-
-            // 3. Leaders
-            const leadersRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaders');
-            onSnapshot(leadersRef, async (s) => {
-                if (s.empty && window.initialLeaders) {
-                    for(let [k, v] of Object.entries(window.initialLeaders)) await setDoc(doc(leadersRef, k), v);
-                } else {
-                    const l = {}; s.docs.forEach(d => l[d.id] = d.data());
-                    window.leadersData = l;
-                    if(window.refreshAdminLeaders) window.refreshAdminLeaders();
-                }
-            });
-
-            // 4. Contacts
-            const contactsRef = collection(db, 'artifacts', appId, 'public', 'data', 'contacts');
-            onSnapshot(contactsRef, (s) => {
-                window.messagesData = s.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp);
-                if(window.refreshAdminMessages) window.refreshAdminMessages();
-            });
-        }
-        init();
-
-        window.saveProject = async (p) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); alert("Saved!"); };
-        window.deleteProject = async (id) => { if(confirm("Delete?")) { await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); alert("Deleted"); }};
-        window.saveSiteText = async (k, c) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); alert("Updated!"); };
-        window.saveLeader = async (key, data) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); alert("Leader Updated!"); };
-        
-        window.submitContact = async (data) => {
-            try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() });
-                return true; 
-            } catch (e) { console.error(e); return false; }
-        };
-    </script>
-
     <script>
         tailwind.config = {
             theme: {
@@ -174,55 +29,43 @@
         .portal-fade-out { opacity: 0; pointer-events: none; transition: opacity 0.8s ease-in-out; }
         .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 1.0s ease-out, transform 1.0s ease-out; }
         .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
-        
         .logo-stroke { fill: none; stroke: currentColor; stroke-dasharray: 4000; stroke-dashoffset: 4000; animation: drawStroke 4s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate; }
         .logo-fill { fill: currentColor; opacity: 0.1; animation: fadeInFill 4s infinite alternate; }
         @keyframes drawStroke { 0% { stroke-dashoffset: 4000; opacity: 0.3; } 100% { stroke-dashoffset: 0; opacity: 1; } }
         @keyframes fadeInFill { 0% { opacity: 0; } 100% { opacity: 0.15; } }
-        
         .portal-interactive-group { cursor: default; display: flex; align-items: center; justify-content: center; gap: 1vw; }
         .portal-letter { display: inline-block; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease; }
         .portal-interactive-group:hover .portal-letter { color: #B85742; transform: translateY(-8px); }
         .portal-slash-svg line { stroke: #A0A0A0; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20; stroke-dashoffset: 20; animation: slashFlow 3s infinite ease-in-out; transition: stroke 0.3s ease; }
         .portal-interactive-group:hover .portal-slash-svg line { stroke: #B85742; }
         @keyframes slashFlow { 0% { stroke-dashoffset: 20; opacity: 0; } 20% { opacity: 1; } 40% { stroke-dashoffset: 0; } 60% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -20; opacity: 0; } }
-
         .hero-float { animation: floating 4s ease-in-out infinite; }
         @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-
         .structure-svg-path { fill: none; stroke-width: 50; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 5000; stroke-dashoffset: 5000; animation: drawStructure 2s ease-out forwards; }
         .structure-svg-fill { fill: #F5F5F5; opacity: 0; animation: fillStructure 1s ease-out 1.5s forwards; }
         @keyframes drawStructure { to { stroke-dashoffset: 0; } }
         @keyframes fillStructure { to { opacity: 1; } }
-
         .link-underline { position: relative; text-decoration: none; }
         .link-underline::after { content: ''; position: absolute; width: 0%; height: 1px; bottom: -4px; left: 0; background-color: #B85742; transition: width 0.4s ease-out; }
         .link-underline:hover::after { width: 100%; }
-
         .bg-grid-pattern { background-size: 40px 40px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px); }
-        
         #mobile-menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 40; transform: translateX(100%); transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1); display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #mobile-menu.open { transform: translateX(0); }
         .hamburger-line { transition: all 0.3s ease-in-out; transform-origin: center; }
         .hamburger-active .line-1 { transform: translateY(7px) rotate(45deg); }
         .hamburger-active .line-2 { opacity: 0; }
         .hamburger-active .line-3 { transform: translateY(-7px) rotate(-45deg); }
-
         .overlay-fixed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 60; overflow-y: auto; transform: translateY(100%); transition: transform 0.6s cubic-bezier(0.77, 0, 0.175, 1); }
         .overlay-fixed.open { transform: translateY(0); }
         .close-btn { position: absolute; top: 2rem; right: 2rem; z-index: 70; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #ddd; transition: all 0.3s ease; }
         .close-btn:hover { background-color: #B85742; border-color: #B85742; color: white; }
-        
         .local-transition { position: absolute; inset: 0; background-color: #fff; z-index: 20; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .local-transition.active { opacity: 1; pointer-events: auto; }
-        
         #transition-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 80; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         #transition-overlay.active { opacity: 1; pointer-events: auto; }
-
         .trans-svg-path { fill: none; stroke: #2E2E2E; stroke-width: 25; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6000; stroke-dashoffset: 6000; }
         .trans-anim-active .trans-svg-path { animation: drawTransStroke 1.8s ease-in-out forwards; }
         @keyframes drawTransStroke { 0% { stroke-dashoffset: 6000; opacity: 0.5; } 100% { stroke-dashoffset: 0; opacity: 1; } }
-
         .admin-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .admin-modal.active { display: flex; }
         .dashboard-tab.active { border-bottom: 2px solid #B85742; color: #B85742; }
@@ -232,6 +75,114 @@
     </style>
 </head>
 <body class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white">
+
+    <!-- 1. STATIC INITIAL DATA (Must be first to avoid race conditions) -->
+    <script>
+        const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100' fill='%23f5f5f5'%3E%3Crect width='100' height='100'/%3E%3Cpath d='M50 50a15 15 0 1 0 0-30 15 15 0 0 0 0 30zm0 8c-18 0-30 10-30 20v5h60v-5c0-10-12-20-30-20z' fill='%23cccccc'/%3E%3C/svg%3E";
+
+        window.initialProjects = [
+             { id: "0", title: "House.C", type: "Single Family Residence", location: "Nantou, Taiwan", year: "2020", designBy: "@yroom.tw", photography: "@cch.tw", tag: "YE/RI", image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop"], description: "結廬在人境，而無車馬喧..." },
+             { id: "1", title: "Quiet Light House", type: "Apartment", location: "Taipei", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"], description: "光是空間的詩。" },
+             { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
+        ];
+
+        window.initialTexts = {
+            "hero-title-cn": "肇於意，成於形",
+            "hero-subtitle-cn": "FROM VISION TO FORM",
+            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
+            "philo-title-cn": "{ / }",
+            "philo-subtitle-cn": "在分界之間，找到自由。",
+            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
+            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。",
+            "hero-subtitle-en": "FROM VISION TO FORM.",
+            "hero-desc-en": "YR ATELIER (Y.R.A.) <br><span class='text-yr-black font-medium'>A multidisciplinary design brand. It is not merely a practice integrating architecture and interior design, but a mindset.</span>",
+            "philo-title-en": "{ / }",
+            "philo-subtitle-en": "Clarity and Calm.",
+            "philo-text-1-en": "「 / 」 is a symbol of threshold and a state of awareness. The slash \"/\" between them is not a divide, but a path of flow.",
+            "philo-text-2-en": "“FROM VISION TO FORM”—we pursue that fleeting moment of inspiration."
+        };
+
+        window.initialLeaders = {
+            "arch": { name: "陳嘉君", title: "主持建築師", edu: "台灣科技大學建築系 碩士", exp: "韻室設計\nNelson Wilmotte Architectes\n劉培森建築師事務所\n陳章安建築師事務所", photo: placeholderImg },
+            "room": { name: "趙韻蓉", title: "總監", edu: "台灣科技大學建築系 學士", exp: "韻室設計\n成舍設計\n長禾設計", photo: placeholderImg },
+            "arch_en": { name: "CHIA-CHUN CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects", photo: placeholderImg },
+            "room_en": { name: "YUN-JUNG CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design", photo: placeholderImg }
+        };
+        
+        // Pre-assign to global scope to ensure availability
+        window.projectsData = window.initialProjects;
+        window.siteTexts = window.initialTexts;
+        window.leadersData = window.initialLeaders;
+    </script>
+
+    <!-- 2. FIREBASE MODULE (Deferred) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = window.__app_id || 'default-app';
+        
+        async function init() {
+            try {
+                if (window.__initial_auth_token) await signInWithCustomToken(auth, window.__initial_auth_token);
+                else await signInAnonymously(auth);
+            } catch (error) { console.error("Auth Error", error); return; }
+
+            if (!auth.currentUser) return;
+            
+            const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
+            onSnapshot(projectsRef, async (s) => {
+                if (s.empty && window.initialProjects) {
+                    for(let p of window.initialProjects) await setDoc(doc(projectsRef, p.id), p);
+                } else {
+                    window.projectsData = s.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
+                    if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+                    if(window.refreshAdminProjects) window.refreshAdminProjects();
+                }
+            });
+
+            const textsRef = collection(db, 'artifacts', appId, 'public', 'data', 'site_texts');
+            onSnapshot(textsRef, async (s) => {
+                if (s.empty && window.initialTexts) {
+                    for(let [k, v] of Object.entries(window.initialTexts)) await setDoc(doc(textsRef, k), { content: v });
+                } else {
+                    const t = {}; s.docs.forEach(d => t[d.id] = d.data().content);
+                    window.siteTexts = t;
+                    if(window.renderTexts) window.renderTexts();
+                    if(window.refreshAdminTexts) window.refreshAdminTexts();
+                }
+            });
+
+            const leadersRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaders');
+            onSnapshot(leadersRef, async (s) => {
+                if (s.empty && window.initialLeaders) {
+                    for(let [k, v] of Object.entries(window.initialLeaders)) await setDoc(doc(leadersRef, k), v);
+                } else {
+                    const l = {}; s.docs.forEach(d => l[d.id] = d.data());
+                    window.leadersData = l;
+                    if(window.refreshAdminLeaders) window.refreshAdminLeaders();
+                }
+            });
+
+            const contactsRef = collection(db, 'artifacts', appId, 'public', 'data', 'contacts');
+            onSnapshot(contactsRef, (s) => {
+                window.messagesData = s.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp);
+                if(window.refreshAdminMessages) window.refreshAdminMessages();
+            });
+        }
+        init();
+
+        window.saveProject = async (p) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); alert("Saved!"); };
+        window.deleteProject = async (id) => { if(confirm("Delete?")) { await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); alert("Deleted"); }};
+        window.saveSiteText = async (k, c) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); alert("Updated!"); };
+        window.saveLeader = async (key, data) => { await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); alert("Leader Updated!"); };
+        window.submitContact = async (data) => { try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() }); return true; } catch (e) { console.error(e); return false; } };
+    </script>
 
     <!-- Portal -->
     <div id="portal" class="fixed inset-0 z-[100] bg-yr-white flex flex-col justify-center items-center overflow-hidden">
@@ -282,7 +233,7 @@
         </div>
     </header>
 
-    <!-- Mobile Menu (Fixed) -->
+    <!-- Mobile Menu -->
     <div id="mobile-menu">
         <nav id="mobile-nav-cn" class="flex flex-col gap-8 text-center items-center hidden">
             <a href="#philosophy-cn" onclick="toggleMobileMenu()" class="text-fluid-xl font-light tracking-widest text-yr-black hover:text-yr-red">/ 底蘊 /</a>
@@ -297,16 +248,12 @@
             <a href="#contact-en" onclick="toggleMobileMenu()" class="text-fluid-lg font-light tracking-widest text-yr-black hover:text-yr-red uppercase">/ Contact /</a>
         </nav>
         <div class="flex gap-8 mt-12 pt-8 border-t border-gray-200 w-1/2 justify-center">
-            <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-500 hover:text-yr-red">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-            </a>
-            <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-500 hover:text-yr-red">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-            </a>
+            <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-500 hover:text-yr-red"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+            <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-500 hover:text-yr-red"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
         </div>
     </div>
 
-    <!-- Global Transition Overlay -->
+    <!-- Overlays -->
     <div id="transition-overlay">
         <div id="trans-logo-arch" class="w-[30vw] h-[30vw] max-w-[200px] max-h-[200px] text-yr-black hidden">
              <svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-full h-full"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg>
@@ -316,7 +263,6 @@
         </div>
     </div>
 
-    <!-- All Projects Overlay -->
     <div id="all-projects-overlay" class="overlay-fixed bg-yr-white">
         <div onclick="closeAllProjects()" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
         <div class="w-full px-[4vw] py-[10vh]">
@@ -325,34 +271,20 @@
         </div>
     </div>
 
-    <!-- Project Detail Overlay -->
     <div id="project-detail-overlay" class="overlay-fixed bg-white z-[70]">
         <div onclick="closeProjectDetail()" class="close-btn fixed"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
         <div id="project-detail-content" class="w-full min-h-screen pb-20"></div>
     </div>
 
-    <!-- NEW: Contact Form Modal -->
     <div id="contact-modal" class="admin-modal z-[80]">
         <div class="bg-white p-8 w-[90%] max-w-[500px] shadow-2xl relative">
             <div onclick="closeContactModal()" class="absolute top-4 right-4 cursor-pointer text-gray-400 hover:text-yr-red">✕</div>
             <h3 class="text-xl font-light tracking-widest mb-8 text-center">START A CONVERSATION</h3>
             <div class="space-y-6">
-                <div>
-                    <label class="block text-xs text-gray-400 tracking-widest mb-2">NAME / COMPANY</label>
-                    <input type="text" id="contact-name" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 tracking-widest mb-2">PHONE</label>
-                    <input type="tel" id="contact-phone" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 tracking-widest mb-2">EMAIL</label>
-                    <input type="email" id="contact-email" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 tracking-widest mb-2">MESSAGE</label>
-                    <textarea id="contact-message" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red h-24 resize-none transition-colors"></textarea>
-                </div>
+                <div><label class="block text-xs text-gray-400 tracking-widest mb-2">NAME / COMPANY</label><input type="text" id="contact-name" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors"></div>
+                <div><label class="block text-xs text-gray-400 tracking-widest mb-2">PHONE</label><input type="tel" id="contact-phone" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors"></div>
+                <div><label class="block text-xs text-gray-400 tracking-widest mb-2">EMAIL</label><input type="email" id="contact-email" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red transition-colors"></div>
+                <div><label class="block text-xs text-gray-400 tracking-widest mb-2">MESSAGE</label><textarea id="contact-message" class="w-full border-b border-gray-300 py-2 outline-none focus:border-yr-red h-24 resize-none transition-colors"></textarea></div>
                 <button onclick="submitContactForm()" class="w-full bg-yr-black text-white py-3 tracking-[0.2em] hover:bg-yr-red transition-colors text-sm">SEND MESSAGE</button>
             </div>
         </div>
@@ -363,171 +295,57 @@
         <div id="content-cn" class="lang-section">
             <section id="hero-cn" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
                 <div class="animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-6 hero-float" data-text-key="hero-title-cn">肇於意，成於形</h2><p class="text-fluid-sm text-yr-red tracking-[0.3em] font-medium mb-8" data-text-key="hero-subtitle-cn">FROM VISION TO FORM</p><div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div></div>
-                <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-cn">YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。</p></div>
+                <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-cn">YR ATELIER (Y.R.A.) ...</p></div>
             </section>
-            
-            <!-- Fixed Philosophy Section with Default Text -->
             <section id="philosophy-cn" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
                 <div class="w-full flex flex-col md:flex-row gap-[4vw]">
                     <div class="w-full md:w-1/3 animate-on-scroll text-left"><h2 class="text-fluid-lg font-bold text-yr-red tracking-[0.2em] mb-4">品牌哲學</h2><h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug"><span data-text-key="philo-title-cn">{ / }</span><br><span class="text-fluid-sm text-gray-400" data-text-key="philo-subtitle-cn">在分界之間，找到自由。</span></h3></div>
                     <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify"><p class="mb-6" data-text-key="philo-text-1-cn">「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。</p></div>
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l md:border-l border-gray-100 pl-[2vw]"><p class="mb-6" data-text-key="philo-text-2-cn">「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。</p></div>
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify"><p class="mb-6" data-text-key="philo-text-1-cn">...</p></div>
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l md:border-l border-gray-100 pl-[2vw]"><p class="mb-6" data-text-key="philo-text-2-cn">...</p></div>
                     </div>
                 </div>
             </section>
-            
-            <!-- CN Structure -->
             <section id="structure-cn" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
-                <div class="w-full animate-on-scroll">
-                    <div class="text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2></div>
-                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]">
-                        <div id="wing-arch-cn" onclick="selectStructure('arch', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
-                            <div class="default-content transition-opacity duration-500">
-                                <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">逸離建築</h3>
-                                <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p>
-                                <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
-                                <p class="text-fluid-sm text-gray-600 font-light tracking-wide">建築設計 / 景觀</p>
-                                <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">超越形體</p>
-                            </div>
-                            <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
-                            <div id="local-trans-room-cn" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div>
-                        </div>
-                        <div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div>
-                        <div id="wing-room-cn" onclick="selectStructure('room', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
-                            <div class="default-content transition-opacity duration-500">
-                                <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">韻室設計</h3>
-                                <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p>
-                                <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
-                                <p class="text-fluid-sm text-gray-600 font-light tracking-wide">室內設計 / 生活</p>
-                                <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">韻於生活</p>
-                            </div>
-                            <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
-                            <div id="local-trans-arch-cn" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div>
-                        </div>
-                    </div>
-                </div>
+                <div class="w-full animate-on-scroll"><div class="text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2></div><div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]"><div id="wing-arch-cn" onclick="selectStructure('arch', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">逸離建築</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">建築設計 / 景觀</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">超越形體</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-room-cn" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div></div><div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div><div id="wing-room-cn" onclick="selectStructure('room', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">韻室設計</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">室內設計 / 生活</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">韻於生活</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-arch-cn" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div></div></div></div>
             </section>
-            
             <section id="projects-cn" class="py-[10vh] bg-white scroll-mt-20">
                 <div class="w-full px-[4vw]">
-                    <div class="flex justify-between items-end mb-[5vh] animate-on-scroll">
-                        <div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2></div>
-                        <button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button>
-                    </div>
+                    <div class="flex justify-between items-end mb-[5vh] animate-on-scroll"><div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2></div><button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button></div>
                     <div id="featured-projects-cn" class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-[4vw]"></div>
                 </div>
             </section>
-            <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
-                <div class="w-full animate-on-scroll">
-                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2>
-                    <h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3>
-                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>在理性與詩性之間，尋找思想的留白。</p>
-                    <button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">開始對話</button>
-                </div>
-            </section>
+            <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20"><div class="w-full animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2><h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3><p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>在理性與詩性之間，尋找思想的留白。</p><button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">開始對話</button></div></section>
         </div>
         
-        <!-- EN -->
         <div id="content-en" class="lang-section">
-             <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6">
-                <div class="animate-on-scroll">
-                    <p class="text-fluid-base text-yr-red tracking-[0.3em] uppercase font-medium mb-8 hero-float" data-text-key="hero-subtitle-en">FROM VISION TO FORM.</p>
-                    <div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div>
-                </div>
-                <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-en">YR ATELIER (Y.R.A.) ...</p></div>
-             </section>
-             
-             <!-- Updated EN Philosophy Section with Data Keys -->
+             <section id="hero-en" class="relative h-[100dvh] flex flex-col justify-center items-center text-center px-6"><div class="animate-on-scroll"><p class="text-fluid-base text-yr-red tracking-[0.3em] uppercase font-medium mb-8 hero-float" data-text-key="hero-subtitle-en">FROM VISION TO FORM.</p><div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div></div><div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-en">YR ATELIER (Y.R.A.) ...</p></div></section>
              <section id="philosophy-en" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
                  <div class="w-full flex flex-col md:flex-row gap-[4vw]">
-                    <div class="w-full md:w-1/3 animate-on-scroll text-left">
-                        <h2 class="text-fluid-base font-bold text-yr-red tracking-[0.2em] mb-4">BRAND PRINCIPLE</h2>
-                        <h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug"><span data-text-key="philo-title-en">{/}<br></span><span class="text-fluid-xs text-gray-400" data-text-key="philo-subtitle-en">Clarity and Calm.</span></h3>
-                    </div>
+                    <div class="w-full md:w-1/3 animate-on-scroll text-left"><h2 class="text-fluid-base font-bold text-yr-red tracking-[0.2em] mb-4">BRAND PRINCIPLE</h2><h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug"><span data-text-key="philo-title-en">{/}<br></span><span class="text-fluid-xs text-gray-400" data-text-key="philo-subtitle-en">Clarity and Calm.</span></h3></div>
                     <div class="w-full md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-[4vw] animate-on-scroll" style="transition-delay: 0.2s;">
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify"><p class="mb-6" data-text-key="philo-text-1-en">「 / 」 is a symbol of threshold and a state of awareness.</p></div>
-                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l md:border-l border-gray-100 pl-[2vw]"><p class="mb-6" data-text-key="philo-text-2-en">“FROM VISION TO FORM”—we pursue that fleeting moment of inspiration.</p></div>
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify"><p class="mb-6" data-text-key="philo-text-1-en">...</p></div>
+                        <div class="text-fluid-sm text-gray-600 leading-relaxed font-light tracking-wide text-justify border-l md:border-l border-gray-100 pl-[2vw]"><p class="mb-6" data-text-key="philo-text-2-en">...</p></div>
                     </div>
                 </div>
             </section>
-
-             <section id="structure-en" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
-                 <div class="w-full animate-on-scroll text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Structure</h2></div>
-                 <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]">
-                    <div id="wing-arch-en" onclick="selectStructure('arch', 'en')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
-                        <div class="default-content transition-opacity duration-500">
-                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">YE/RI ARCHITECTS</h3>
-                            <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p>
-                            <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
-                            <p class="text-fluid-sm text-gray-600 font-light tracking-wide">Architecture / Landscape</p>
-                            <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em] uppercase">Beyond Form</p>
-                        </div>
-                        <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
-                        <div id="local-trans-room-en" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div>
-                    </div>
-                    <div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div>
-                    <div id="wing-room-en" onclick="selectStructure('room', 'en')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
-                        <div class="default-content transition-opacity duration-500">
-                            <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">Y/ROOM DESIGN</h3>
-                            <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p>
-                            <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
-                            <p class="text-fluid-sm text-gray-600 font-light tracking-wide">Interior / Living</p>
-                            <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em] uppercase">Rhythm in Life</p>
-                        </div>
-                        <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
-                        <div id="local-trans-arch-en" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div>
-                    </div>
-                </div>
-             </section>
+             <section id="structure-en" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20"><div class="w-full animate-on-scroll text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Structure</h2></div><div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]"><div id="wing-arch-en" onclick="selectStructure('arch', 'en')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">YE/RI ARCHITECTS</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">Architecture / Landscape</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em] uppercase">Beyond Form</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-room-en" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div></div><div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div><div id="wing-room-en" onclick="selectStructure('room', 'en')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">Y/ROOM DESIGN</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">Interior / Living</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em] uppercase">Rhythm in Life</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-arch-en" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div></div></div></section>
              <section id="projects-en" class="py-[10vh] bg-white scroll-mt-20"><div class="w-full px-[4vw]"><div class="flex justify-between items-end mb-[5vh] animate-on-scroll"><div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">Selected Projects</h2></div><button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">VIEW ALL</button></div><div id="featured-projects-en" class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-[4vw]"></div></div></section>
              <section id="contact-en" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20"><div class="w-full animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">From Vision to Form</h2><button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">CONTACT US</button></div></section>
         </div>
     </main>
 
-    <footer class="bg-yr-white py-8 text-center border-t border-gray-200"><button onclick="openAdminLogin()" class="text-gray-300 hover:text-yr-red text-xs tracking-widest cursor-pointer transition-colors">Y.R.A</button></footer>
-
-    <!-- Admin Modal -->
+    <!-- Admin & Script 2 -->
     <div id="login-modal" class="admin-modal"><div class="bg-white p-8 w-[90%] max-w-[400px] text-center shadow-2xl relative"><div onclick="closeAdminLogin()" class="absolute top-4 right-4 cursor-pointer">✕</div><h3 class="text-xl font-light tracking-widest mb-6">BACKEND LOGIN</h3><input type="text" id="admin-id" placeholder="ID" class="w-full border-b border-gray-300 p-2 mb-4 outline-none focus:border-yr-red tracking-widest"><input type="password" id="admin-pw" placeholder="PASSWORD" class="w-full border-b border-gray-300 p-2 mb-8 outline-none focus:border-yr-red tracking-widest"><button onclick="attemptLogin()" class="bg-yr-black text-white px-6 py-2 tracking-widest hover:bg-yr-red transition-colors w-full">ENTER</button></div></div>
-
-    <!-- Dashboard -->
-    <div id="admin-dashboard" class="overlay-fixed bg-yr-white z-[90]">
-        <div onclick="closeAdminDashboard()" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div>
-        <div class="w-full h-full flex flex-col">
-            <div class="h-[10vh] flex items-center justify-center border-b border-gray-200 bg-white"><h2 class="text-fluid-lg tracking-widest">ADMIN DASHBOARD</h2></div>
-            <div class="flex flex-1 overflow-hidden">
-                <div class="w-1/4 bg-white border-r border-gray-200 flex flex-col p-6 gap-4">
-                    <button onclick="switchAdminTab('projects')" id="tab-projects" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest active">PROJECTS</button>
-                    <button onclick="switchAdminTab('texts')" id="tab-texts" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">SITE TEXTS</button>
-                    <button onclick="switchAdminTab('leaders')" id="tab-leaders" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">LEADERS</button>
-                    <!-- New Messages Tab -->
-                    <button onclick="switchAdminTab('messages')" id="tab-messages" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">MESSAGES</button>
-                </div>
-                <div class="w-3/4 p-8 overflow-y-auto bg-gray-50">
-                    <div id="panel-projects"><button onclick="addNewProject()" class="mb-8 bg-yr-red text-white px-4 py-2 text-sm tracking-widest hover:bg-black transition-colors">+ NEW PROJECT</button><div id="admin-projects-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div>
-                    <div id="panel-texts" class="hidden"><div id="admin-texts-list" class="space-y-6"></div></div>
-                    <div id="panel-leaders" class="hidden"><div id="admin-leaders-list" class="space-y-8"></div></div>
-                    <!-- New Messages Panel -->
-                    <div id="panel-messages" class="hidden"><div id="admin-messages-list" class="space-y-4"></div></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Project Modal -->
+    <div id="admin-dashboard" class="overlay-fixed bg-yr-white z-[90]"><div onclick="closeAdminDashboard()" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div><div class="w-full h-full flex flex-col"><div class="h-[10vh] flex items-center justify-center border-b border-gray-200 bg-white"><h2 class="text-fluid-lg tracking-widest">ADMIN DASHBOARD</h2></div><div class="flex flex-1 overflow-hidden"><div class="w-1/4 bg-white border-r border-gray-200 flex flex-col p-6 gap-4"><button onclick="switchAdminTab('projects')" id="tab-projects" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest active">PROJECTS</button><button onclick="switchAdminTab('texts')" id="tab-texts" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">SITE TEXTS</button><button onclick="switchAdminTab('leaders')" id="tab-leaders" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">LEADERS</button><button onclick="switchAdminTab('messages')" id="tab-messages" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">MESSAGES</button></div><div class="w-3/4 p-8 overflow-y-auto bg-gray-50"><div id="panel-projects"><button onclick="addNewProject()" class="mb-8 bg-yr-red text-white px-4 py-2 text-sm tracking-widest hover:bg-black transition-colors">+ NEW PROJECT</button><div id="admin-projects-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div><div id="panel-texts" class="hidden"><div id="admin-texts-list" class="space-y-6"></div></div><div id="panel-leaders" class="hidden"><div id="admin-leaders-list" class="space-y-8"></div></div><div id="panel-messages" class="hidden"><div id="admin-messages-list" class="space-y-4"></div></div></div></div></div></div>
     <div id="edit-project-modal" class="admin-modal z-[100]"><div class="bg-white p-8 w-[90%] max-w-[600px] max-h-[90vh] overflow-y-auto shadow-2xl relative"><div onclick="closeEditModal()" class="absolute top-4 right-4 cursor-pointer text-xl">✕</div><h3 class="text-xl font-light tracking-widest mb-6 text-center" id="edit-modal-title">EDIT PROJECT</h3><div class="space-y-4"><input type="hidden" id="edit-p-id"><div><label class="text-xs text-gray-400">TITLE</label><input id="edit-p-title" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">TYPE</label><input id="edit-p-type" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">LOCATION</label><input id="edit-p-location" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">YEAR</label><input id="edit-p-year" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">DESIGN BY</label><input id="edit-p-design" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">PHOTOGRAPHY</label><input id="edit-p-photo" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">TAG (YE/RI or Y/ROOM)</label><input id="edit-p-tag" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">MAIN IMAGE URL</label><input id="edit-p-image" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">GALLERY URLS (Comma separated)</label><textarea id="edit-p-images" class="w-full border p-2 h-20"></textarea></div><div><label class="text-xs text-gray-400">DESCRIPTION (HTML Allowed)</label><textarea id="edit-p-desc" class="w-full border p-2 h-32"></textarea></div><div class="flex items-center gap-2"><input type="checkbox" id="edit-p-coming"><label class="text-sm">Coming Soon Mode</label></div><button onclick="submitProjectEdit()" class="w-full bg-yr-black text-white py-3 mt-4 tracking-widest hover:bg-yr-red">SAVE</button></div></div></div>
 
     <script>
-        // --- Initial Render ---
-        window.projectsData = window.initialProjects;
-        window.siteTexts = window.initialTexts;
-        window.leadersData = window.initialLeaders;
-
         // --- Core ---
         let currentLang = 'cn';
         function enterSite(lang) { currentLang = lang; document.getElementById('portal').classList.add('portal-fade-out'); setTimeout(() => { document.getElementById('portal').style.display = 'none'; document.getElementById('header').classList.remove('opacity-0', 'pointer-events-none'); document.getElementById('main-content').classList.remove('hidden'); switchLanguage(lang); checkScroll(); if(window.projectsData) renderFrontendProjects(window.projectsData); }, 800); }
         function backToPortal() { document.getElementById('mobile-menu').classList.remove('open'); closeAllProjects(); closeProjectDetail(); closeAdminDashboard(); restoreDefaultStructure(); document.getElementById('header').classList.add('opacity-0', 'pointer-events-none'); const portal = document.getElementById('portal'); portal.style.display = 'flex'; void portal.offsetWidth; portal.classList.remove('portal-fade-out'); setTimeout(() => { document.getElementById('main-content').classList.add('hidden'); window.scrollTo(0, 0); }, 500); }
-        function switchLanguage(lang) { document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active')); document.getElementById(`content-${lang}`).classList.add('active'); document.querySelectorAll('.lang-nav').forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); }); const targetNav = document.getElementById(`nav-${lang}`); if (targetNav) { targetNav.classList.remove('hidden'); targetNav.classList.add('flex'); } document.getElementById('mobile-nav-cn').classList.add('hidden'); document.getElementById('mobile-nav-en').classList.add('hidden'); document.getElementById(`mobile-nav-${lang}`).classList.remove('hidden'); renderTexts(); }
+        function switchLanguage(lang) { document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active')); document.getElementById(`content-${lang}`).classList.add('active'); document.querySelectorAll('.lang-nav').forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); }); const targetNav = document.getElementById(`nav-${lang}`); if (targetNav) { targetNav.classList.remove('hidden'); targetNav.classList.add('flex'); } document.getElementById('mobile-nav-cn').classList.add('hidden'); document.getElementById('mobile-nav-en').classList.add('hidden'); document.getElementById(`mobile-nav-${lang}`).classList.remove('hidden'); renderTexts(); if(window.projectsData) renderFrontendProjects(window.projectsData); }
         function toggleMobileMenu() { const menu = document.getElementById('mobile-menu'); const btn = document.getElementById('hamburger-btn'); menu.classList.toggle('open'); btn.classList.toggle('hamburger-active'); document.body.style.overflow = menu.classList.contains('open') ? 'hidden' : ''; }
         function checkScroll() { const h = document.getElementById('header'); window.scrollY > 50 ? h.classList.add('bg-white/90', 'backdrop-blur-sm', 'shadow-sm') : h.classList.remove('bg-white/90', 'backdrop-blur-sm', 'shadow-sm'); document.querySelectorAll('.animate-on-scroll').forEach(el => { if (el.getBoundingClientRect().top < window.innerHeight * 0.9) el.classList.add('is-visible'); }); }
         window.addEventListener('scroll', checkScroll);
@@ -544,7 +362,7 @@
             if ((currentStructureState === `arch${suffix}_active` && type === 'arch') || (currentStructureState === `room${suffix}_active` && type === 'room')) { restoreDefaultStructure(); return; }
             const archWing = document.getElementById('wing-arch' + suffix);
             const roomWing = document.getElementById('wing-room' + suffix);
-            const leaders = window.leadersData || window.initialLeaders;
+            const leaders = window.leadersData || window.initialLeaders || {};
             document.querySelectorAll('.default-content').forEach(el => el.classList.remove('hidden', 'opacity-0'));
             document.querySelectorAll('.detail-content').forEach(el => { el.classList.add('hidden', 'opacity-0'); el.classList.remove('flex'); });
             document.querySelectorAll('.local-transition').forEach(el => { el.classList.add('hidden'); el.classList.remove('active', 'trans-anim-active'); });
@@ -611,39 +429,9 @@
         window.changeMainImage = (src, index) => { const main = document.getElementById('detail-main-image'); main.classList.add('opacity-0'); setTimeout(() => { main.src = src; main.classList.remove('opacity-0'); }, 200); document.getElementById('image-counter').innerText = index + 1; document.querySelectorAll('.thumbnail-item').forEach((t, i) => t.className = `thumbnail-item w-16 h-12 md:w-24 md:h-16 flex-shrink-0 cursor-pointer border border-transparent hover:border-white/50 transition-all ${i === index ? 'border-yr-red opacity-100' : 'opacity-60 hover:opacity-100'}`); };
 
         // Contact Modal Logic
-        window.openContactModal = () => {
-            document.getElementById('contact-modal').classList.add('active');
-        };
-        window.closeContactModal = () => {
-            document.getElementById('contact-modal').classList.remove('active');
-        };
-        window.submitContactForm = async () => {
-            const name = document.getElementById('contact-name').value;
-            const phone = document.getElementById('contact-phone').value;
-            const email = document.getElementById('contact-email').value;
-            const message = document.getElementById('contact-message').value;
-
-            if (!name || !email || !message) {
-                alert('請填寫必要欄位 (姓名, Email, 留言)');
-                return;
-            }
-
-            const success = await window.submitContact({
-                name, phone, email, message
-            });
-
-            if (success) {
-                alert('訊息已發送！(Message Sent)');
-                closeContactModal();
-                // Clear fields
-                document.getElementById('contact-name').value = '';
-                document.getElementById('contact-phone').value = '';
-                document.getElementById('contact-email').value = '';
-                document.getElementById('contact-message').value = '';
-            } else {
-                alert('發送失敗，請稍後再試。(Failed to send)');
-            }
-        };
+        window.openContactModal = () => { document.getElementById('contact-modal').classList.add('active'); };
+        window.closeContactModal = () => { document.getElementById('contact-modal').classList.remove('active'); };
+        window.submitContactForm = async () => { const name = document.getElementById('contact-name').value; const phone = document.getElementById('contact-phone').value; const email = document.getElementById('contact-email').value; const message = document.getElementById('contact-message').value; if (!name || !email || !message) { alert('請填寫必要欄位 (姓名, Email, 留言)'); return; } const success = await window.submitContact({ name, phone, email, message }); if (success) { alert('訊息已發送！(Message Sent)'); closeContactModal(); document.getElementById('contact-name').value = ''; document.getElementById('contact-phone').value = ''; document.getElementById('contact-email').value = ''; document.getElementById('contact-message').value = ''; } else { alert('發送失敗，請稍後再試。(Failed to send)'); } };
 
         // --- Admin ---
         window.openAdminLogin = () => document.getElementById('login-modal').classList.add('active');
@@ -656,7 +444,7 @@
         window.refreshAdminTexts = () => { const l = document.getElementById('admin-texts-list'); const t = window.siteTexts || {}; const k = ["hero-title-cn", "hero-subtitle-cn", "hero-desc-cn", "philo-title-cn", "philo-subtitle-cn", "philo-text-1-cn", "philo-text-2-cn", "hero-subtitle-en", "hero-desc-en", "philo-title-en", "philo-subtitle-en", "philo-text-1-en", "philo-text-2-en"]; l.innerHTML = k.map(key => `<div class="bg-white p-4 border border-gray-200 shadow-sm"><div class="text-xs text-gray-400 font-bold mb-2 uppercase">${key}</div><textarea id="txt-input-${key}" class="w-full border border-gray-300 p-2 text-sm h-24">${t[key] || ''}</textarea><button onclick="saveSiteText('${key}', document.getElementById('txt-input-${key}').value)" class="mt-2 bg-yr-black text-white text-xs px-4 py-2 tracking-widest hover:bg-yr-red">UPDATE</button></div>`).join(''); };
         window.refreshAdminLeaders = () => {
             const l = document.getElementById('admin-leaders-list');
-            const d = window.leadersData || window.initialLeaders;
+            const d = window.leadersData || window.initialLeaders || {};
             const keys = ['arch', 'room', 'arch_en', 'room_en'];
             l.innerHTML = keys.map(key => {
                 const data = d[key] || {};
@@ -715,8 +503,6 @@
         window.editProject = (id) => { const p = window.projectsData.find(x => x.id == id); if(!p) return; document.getElementById('edit-modal-title').innerText = "EDIT PROJECT"; document.getElementById('edit-p-id').value = p.id; document.getElementById('edit-p-title').value = p.title; document.getElementById('edit-p-type').value = p.type; document.getElementById('edit-p-location').value = p.location || ''; document.getElementById('edit-p-year').value = p.year || ''; document.getElementById('edit-p-design').value = p.designBy || ''; document.getElementById('edit-p-photo').value = p.photography || ''; document.getElementById('edit-p-tag').value = p.tag || ''; document.getElementById('edit-p-image').value = p.image || ''; document.getElementById('edit-p-images').value = (p.images || []).join(','); document.getElementById('edit-p-desc').value = p.description || ''; document.getElementById('edit-p-coming').checked = !!p.isComingSoon; document.getElementById('edit-project-modal').classList.add('active'); };
         window.submitProjectEdit = () => { const id = document.getElementById('edit-p-id').value; const p = { id: id, title: document.getElementById('edit-p-title').value, type: document.getElementById('edit-p-type').value, location: document.getElementById('edit-p-location').value, year: document.getElementById('edit-p-year').value, designBy: document.getElementById('edit-p-design').value, photography: document.getElementById('edit-p-photo').value, tag: document.getElementById('edit-p-tag').value, image: document.getElementById('edit-p-image').value, images: document.getElementById('edit-p-images').value.split(',').filter(x => x.trim() !== ''), description: document.getElementById('edit-p-desc').value, isComingSoon: document.getElementById('edit-p-coming').checked }; window.saveProject(p); closeEditModal(); };
         window.closeEditModal = () => document.getElementById('edit-project-modal').classList.remove('active');
-
-        if(window.initialProjects) renderFrontendProjects(window.initialProjects);
     </script>
 </body>
 </html>

@@ -76,7 +76,7 @@
 </head>
 <body class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white">
 
-    <!-- 1. STATIC INITIAL DATA (Must be first to avoid race conditions) -->
+    <!-- 1. STATIC INITIAL DATA -->
     <script>
         const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100' fill='%23f5f5f5'%3E%3Crect width='100' height='100'/%3E%3Cpath d='M50 50a15 15 0 1 0 0-30 15 15 0 0 0 0 30zm0 8c-18 0-30 10-30 20v5h60v-5c0-10-12-20-30-20z' fill='%23cccccc'/%3E%3C/svg%3E";
 
@@ -105,17 +105,16 @@
         window.initialLeaders = {
             "arch": { name: "陳嘉君", title: "主持建築師", edu: "台灣科技大學建築系 碩士", exp: "韻室設計\nNelson Wilmotte Architectes\n劉培森建築師事務所\n陳章安建築師事務所", photo: placeholderImg },
             "room": { name: "趙韻蓉", title: "總監", edu: "台灣科技大學建築系 學士", exp: "韻室設計\n成舍設計\n長禾設計", photo: placeholderImg },
-            "arch_en": { name: "CHIA-CHUN CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects", photo: placeholderImg },
-            "room_en": { name: "YUN-JUNG CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design", photo: placeholderImg }
+            "arch_en": { name: "Shiva CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nRicky Liu & Associates Architects+Planners\nJ.A. Chen Architects & Associates", photo: placeholderImg },
+            "room_en": { name: "Joan CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\n FULLHOUSE INTERIOR DESIGN GROUP\nLongtree Design", photo: placeholderImg }
         };
         
-        // Pre-assign to global scope to ensure availability
         window.projectsData = window.initialProjects;
         window.siteTexts = window.initialTexts;
         window.leadersData = window.initialLeaders;
     </script>
 
-    <!-- 2. FIREBASE MODULE (Deferred) -->
+    <!-- 2. FIREBASE MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -140,9 +139,12 @@
                 if (s.empty && window.initialProjects) {
                     for(let p of window.initialProjects) await setDoc(doc(projectsRef, p.id), p);
                 } else {
-                    window.projectsData = s.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
-                    if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
-                    if(window.refreshAdminProjects) window.refreshAdminProjects();
+                    // Only update if we got meaningful data
+                    if(s.docs.length > 0) {
+                        window.projectsData = s.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
+                        if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+                        if(window.refreshAdminProjects) window.refreshAdminProjects();
+                    }
                 }
             });
 
@@ -151,10 +153,12 @@
                 if (s.empty && window.initialTexts) {
                     for(let [k, v] of Object.entries(window.initialTexts)) await setDoc(doc(textsRef, k), { content: v });
                 } else {
-                    const t = {}; s.docs.forEach(d => t[d.id] = d.data().content);
-                    window.siteTexts = t;
-                    if(window.renderTexts) window.renderTexts();
-                    if(window.refreshAdminTexts) window.refreshAdminTexts();
+                     if(s.docs.length > 0) {
+                        const t = {}; s.docs.forEach(d => t[d.id] = d.data().content);
+                        window.siteTexts = t;
+                        if(window.renderTexts) window.renderTexts();
+                        if(window.refreshAdminTexts) window.refreshAdminTexts();
+                     }
                 }
             });
 
@@ -163,9 +167,11 @@
                 if (s.empty && window.initialLeaders) {
                     for(let [k, v] of Object.entries(window.initialLeaders)) await setDoc(doc(leadersRef, k), v);
                 } else {
-                    const l = {}; s.docs.forEach(d => l[d.id] = d.data());
-                    window.leadersData = l;
-                    if(window.refreshAdminLeaders) window.refreshAdminLeaders();
+                    if(s.docs.length > 0) {
+                        const l = {}; s.docs.forEach(d => l[d.id] = d.data());
+                        window.leadersData = l;
+                        if(window.refreshAdminLeaders) window.refreshAdminLeaders();
+                    }
                 }
             });
 
@@ -233,7 +239,7 @@
         </div>
     </header>
 
-    <!-- Mobile Menu -->
+    <!-- Mobile Menu (Fixed) -->
     <div id="mobile-menu">
         <nav id="mobile-nav-cn" class="flex flex-col gap-8 text-center items-center hidden">
             <a href="#philosophy-cn" onclick="toggleMobileMenu()" class="text-fluid-xl font-light tracking-widest text-yr-black hover:text-yr-red">/ 底蘊 /</a>
@@ -248,8 +254,12 @@
             <a href="#contact-en" onclick="toggleMobileMenu()" class="text-fluid-lg font-light tracking-widest text-yr-black hover:text-yr-red uppercase">/ Contact /</a>
         </nav>
         <div class="flex gap-8 mt-12 pt-8 border-t border-gray-200 w-1/2 justify-center">
-            <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-500 hover:text-yr-red"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
-            <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-500 hover:text-yr-red"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+            <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-500 hover:text-yr-red">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+            </a>
+            <a href="https://www.instagram.com/yroom.tw/" target="_blank" class="text-gray-500 hover:text-yr-red">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            </a>
         </div>
     </div>
 
@@ -297,6 +307,7 @@
                 <div class="animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-6 hero-float" data-text-key="hero-title-cn">肇於意，成於形</h2><p class="text-fluid-sm text-yr-red tracking-[0.3em] font-medium mb-8" data-text-key="hero-subtitle-cn">FROM VISION TO FORM</p><div class="w-12 h-[1px] bg-yr-black mx-auto opacity-20 mb-8"></div></div>
                 <div class="absolute bottom-[10vh] w-full px-[10vw] text-center animate-on-scroll" style="transition-delay: 0.3s;"><p class="text-fluid-sm text-gray-600 leading-loose font-light tracking-wide text-center" data-text-key="hero-desc-cn">YR ATELIER (Y.R.A.) ...</p></div>
             </section>
+            
             <section id="philosophy-cn" class="py-[10vh] px-[4vw] bg-white border-t border-gray-100 scroll-mt-20">
                 <div class="w-full flex flex-col md:flex-row gap-[4vw]">
                     <div class="w-full md:w-1/3 animate-on-scroll text-left"><h2 class="text-fluid-lg font-bold text-yr-red tracking-[0.2em] mb-4">品牌哲學</h2><h3 class="text-fluid-xl font-light text-yr-black tracking-widest leading-snug"><span data-text-key="philo-title-cn">{ / }</span><br><span class="text-fluid-sm text-gray-400" data-text-key="philo-subtitle-cn">在分界之間，找到自由。</span></h3></div>
@@ -306,16 +317,56 @@
                     </div>
                 </div>
             </section>
+            
+            <!-- CN Structure -->
             <section id="structure-cn" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
-                <div class="w-full animate-on-scroll"><div class="text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2></div><div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]"><div id="wing-arch-cn" onclick="selectStructure('arch', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">逸離建築</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">建築設計 / 景觀</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">超越形體</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-room-cn" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div></div><div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div><div id="wing-room-cn" onclick="selectStructure('room', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center"><div class="default-content transition-opacity duration-500"><h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">韻室設計</h3><p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p><div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div><p class="text-fluid-sm text-gray-600 font-light tracking-wide">室內設計 / 生活</p><p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">韻於生活</p></div><div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div><div id="local-trans-arch-cn" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div></div></div></div>
+                <div class="w-full animate-on-scroll">
+                    <div class="text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2></div>
+                    <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]">
+                        <div id="wing-arch-cn" onclick="selectStructure('arch', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
+                            <div class="default-content transition-opacity duration-500">
+                                <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">逸離建築</h3>
+                                <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">YE/RI ARCHITECTS</p>
+                                <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
+                                <p class="text-fluid-sm text-gray-600 font-light tracking-wide">建築設計 / 景觀</p>
+                                <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">超越形體</p>
+                            </div>
+                            <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
+                            <div id="local-trans-room-cn" class="local-transition hidden"><svg viewBox="46070 26370 2030 2000" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="46073.72,26373.49 47111.93,27272.6 47111.93,28369.67 "/><polyline class="trans-svg-path" stroke="currentColor" fill="none" points="47111.95,26373.02 48090.9,26373.02 47436.49,27272.73 47785.92,27575.23 "/></g></svg></div>
+                        </div>
+                        <div class="hidden md:flex flex-col justify-center items-center px-[2vw]"><div class="w-[1px] h-full bg-gray-300"></div></div>
+                        <div id="wing-room-cn" onclick="selectStructure('room', 'cn')" class="flex-1 bg-white p-[2vw] py-[4vh] text-center border border-gray-100 hover:border-yr-black transition-all duration-500 group cursor-pointer hover:shadow-lg relative overflow-hidden flex flex-col justify-center">
+                            <div class="default-content transition-opacity duration-500">
+                                <h3 class="text-fluid-lg tracking-widest mb-2 group-hover:text-yr-red transition-colors whitespace-nowrap">韻室設計</h3>
+                                <p class="text-fluid-sm text-gray-400 tracking-widest mb-[3vh]">Y/ROOM</p>
+                                <div class="w-8 h-[1px] bg-yr-black mx-auto mb-[3vh]"></div>
+                                <p class="text-fluid-sm text-gray-600 font-light tracking-wide">室內設計 / 生活</p>
+                                <p class="mt-[3vh] text-fluid-sm text-yr-black font-bold tracking-[0.2em]">韻於生活</p>
+                            </div>
+                            <div class="detail-content hidden opacity-0 transition-opacity duration-500 absolute inset-0 bg-white p-8 flex-col justify-center items-center text-left overflow-y-auto"></div>
+                            <div id="local-trans-arch-cn" class="local-transition hidden"><svg viewBox="81800 47660 2020 1860" xmlns="http://www.w3.org/2000/svg" class="w-[30%] h-[30%] text-yr-black"><g><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,49195.46 83819.67,48295.75 83819.67,47666.28 83165.26,48565.99 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83819.67,47666.28 82840.72,47666.28 82840.72,48295.75 83360.03,48295.75 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="82896.49,48614.18 81802.49,47666.75 81802.49,48565.31 82896.49,49512.74 "/><polygon class="trans-svg-path" stroke="currentColor" fill="none" points="83165.26,48565.99 83165.26,49195.46 83514.69,49497.96 83514.69,48868.49 "/></g></svg></div>
+                        </div>
+                    </div>
+                </div>
             </section>
+            
             <section id="projects-cn" class="py-[10vh] bg-white scroll-mt-20">
                 <div class="w-full px-[4vw]">
-                    <div class="flex justify-between items-end mb-[5vh] animate-on-scroll"><div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2></div><button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button></div>
+                    <div class="flex justify-between items-end mb-[5vh] animate-on-scroll">
+                        <div><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">近期作品</h2></div>
+                        <button onclick="openAllProjects()" class="text-fluid-xs font-bold text-yr-red tracking-widest border-b border-yr-red pb-1 whitespace-nowrap hover:text-yr-black hover:border-yr-black transition-colors">查看全部</button>
+                    </div>
                     <div id="featured-projects-cn" class="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-[4vw]"></div>
                 </div>
             </section>
-            <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20"><div class="w-full animate-on-scroll"><h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2><h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3><p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>在理性與詩性之間，尋找思想的留白。</p><button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">開始對話</button></div></section>
+            <section id="contact-cn" class="py-[15vh] px-[4vw] text-center bg-yr-white border-t border-gray-200 scroll-mt-20">
+                <div class="w-full animate-on-scroll">
+                    <h2 class="text-fluid-2xl font-light tracking-widest text-yr-black mb-[3vh]">從構想到形體</h2>
+                    <h3 class="text-fluid-lg font-light tracking-widest text-gray-500 mb-[3vh]">肇於意，成於形</h3>
+                    <p class="text-gray-500 font-light tracking-widest leading-loose mb-[3vh] text-fluid-sm">我們相信空間的核心，不在於區隔，而在於連結。<br>在理性與詩性之間，尋找思想的留白。</p>
+                    <button onclick="openContactModal()" class="inline-block bg-yr-red text-white px-[3vw] py-[2vh] text-fluid-xs font-bold tracking-[0.2em] hover:bg-yr-black transition-colors duration-300 mt-8">開始對話</button>
+                </div>
+            </section>
         </div>
         
         <div id="content-en" class="lang-section">
@@ -409,7 +460,7 @@
         };
 
         // --- Overlays ---
-        window.openAllProjects = () => { const d = window.projectsData || []; document.getElementById('projects-grid-container').innerHTML = d.map(p => p.isComingSoon ? `<div class="aspect-[4/3] bg-gray-200 flex items-center justify-center flex-col text-yr-grey"><span class="text-fluid-lg tracking-widest font-light">COMING SOON</span><div class="w-8 h-[1px] bg-gray-400 my-2"></div><span class="text-fluid-xs tracking-widest">Y/R/A</span></div>` : `<div class="project-card group cursor-pointer" onclick="openProjectDetail('${p.id}')"><div class="aspect-[4/3] bg-gray-100 overflow-hidden relative"><img src="${p.image}" class="project-img w-full h-full object-cover transition-transform duration-700 grayscale-0 md:grayscale md:group-hover:grayscale-0"><div class="absolute top-4 left-4 bg-yr-black text-white text-[10px] px-2 py-1 tracking-widest">${p.tag}</div></div><div class="mt-[2vh]"><h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">${p.title}</h3><p class="text-fluid-xs text-gray-400 mt-1 tracking-wider">${p.type}</p></div></div>`).join(''); document.getElementById('all-projects-overlay').classList.add('open'); document.body.style.overflow = 'hidden'; };
+        window.openAllProjects = () => { const d = window.projectsData || []; document.getElementById('projects-grid-container').innerHTML = d.map(p => p.isComingSoon ? `<div class="aspect-[4/3] bg-gray-200 flex items-center justify-center flex-col text-yr-grey"><span class="text-fluid-lg tracking-widest font-light">COMING SOON</span><div class="w-8 h-[1px] bg-gray-400 my-2"></div><span class="text-fluid-xs tracking-widest">Y/R/A</span></div>` : `<div class="project-card group cursor-pointer" onclick="openProjectDetail('${p.id}')"><div class="aspect-[4/3] bg-gray-100 overflow-hidden relative"><img src="${p.image}" class="project-img w-full h-full object-cover transition-transform duration-700 grayscale-0 md:grayscale md:group-hover:grayscale-0"><div class="absolute top-4 left-4 bg-yr-black text-white text-[10px] px-2 py-1 tracking-widest">${p.tag}</div></div><div class="mt-[2vh]"><h3 class="text-fluid-base font-light tracking-widest group-hover:text-yr-red transition-colors">${p.title}</h3><p class="text-fluid-xs text-gray-400 mt-1 tracking-wider">${p.type} / ${p.location}</p></div></div>`).join(''); document.getElementById('all-projects-overlay').classList.add('open'); document.body.style.overflow = 'hidden'; };
         window.closeAllProjects = () => { document.getElementById('all-projects-overlay').classList.remove('open'); document.body.style.overflow = ''; };
         
         let currentProjectImages = [];
@@ -503,6 +554,14 @@
         window.editProject = (id) => { const p = window.projectsData.find(x => x.id == id); if(!p) return; document.getElementById('edit-modal-title').innerText = "EDIT PROJECT"; document.getElementById('edit-p-id').value = p.id; document.getElementById('edit-p-title').value = p.title; document.getElementById('edit-p-type').value = p.type; document.getElementById('edit-p-location').value = p.location || ''; document.getElementById('edit-p-year').value = p.year || ''; document.getElementById('edit-p-design').value = p.designBy || ''; document.getElementById('edit-p-photo').value = p.photography || ''; document.getElementById('edit-p-tag').value = p.tag || ''; document.getElementById('edit-p-image').value = p.image || ''; document.getElementById('edit-p-images').value = (p.images || []).join(','); document.getElementById('edit-p-desc').value = p.description || ''; document.getElementById('edit-p-coming').checked = !!p.isComingSoon; document.getElementById('edit-project-modal').classList.add('active'); };
         window.submitProjectEdit = () => { const id = document.getElementById('edit-p-id').value; const p = { id: id, title: document.getElementById('edit-p-title').value, type: document.getElementById('edit-p-type').value, location: document.getElementById('edit-p-location').value, year: document.getElementById('edit-p-year').value, designBy: document.getElementById('edit-p-design').value, photography: document.getElementById('edit-p-photo').value, tag: document.getElementById('edit-p-tag').value, image: document.getElementById('edit-p-image').value, images: document.getElementById('edit-p-images').value.split(',').filter(x => x.trim() !== ''), description: document.getElementById('edit-p-desc').value, isComingSoon: document.getElementById('edit-p-coming').checked }; window.saveProject(p); closeEditModal(); };
         window.closeEditModal = () => document.getElementById('edit-project-modal').classList.remove('active');
+        
+        // Initial Render Trigger: Wait for DOM Content Loaded
+        document.addEventListener("DOMContentLoaded", function() {
+            if (window.initialProjects) {
+                window.renderFrontendProjects(window.initialProjects);
+                window.renderTexts(); // Render texts if initialTexts are available
+            }
+        });
     </script>
 </body>
 </html>

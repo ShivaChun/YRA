@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- SECURITY: Tell bots not to index this page -->
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="googlebot" content="noindex, nofollow">
     <title>Y/R/A  | 逸離建築/韻室設計</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -23,7 +26,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #F5F5F5; color: #2E2E2E; -webkit-font-smoothing: antialiased; overflow-x: hidden; touch-action: manipulation; }
+        /* SECURITY: Disable Text Selection */
+        body { 
+            font-family: 'Inter', 'Noto Sans TC', sans-serif; 
+            background-color: #F5F5F5; 
+            color: #2E2E2E; 
+            -webkit-font-smoothing: antialiased; 
+            overflow-x: hidden; 
+            touch-action: manipulation;
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE10+/Edge */
+            user-select: none; /* Standard */
+        }
+        
+        /* Allow selection in input fields */
+        input, textarea { user-select: text; -webkit-user-select: text; }
+
         .lang-section { display: none; opacity: 0; transition: opacity 0.8s ease-in-out; }
         .lang-section.active { display: block; opacity: 1; }
         .portal-fade-out { opacity: 0; pointer-events: none; transition: opacity 0.8s ease-in-out; }
@@ -91,9 +110,188 @@
         :root { --section-padding-x: 4vw; }
     </style>
 </head>
-<body class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white flex flex-col min-h-screen">
+<!-- Disable Right Click directly on body -->
+<body oncontextmenu="return false" class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white flex flex-col min-h-screen">
 
     <div id="toast-container"></div>
+
+    <!-- 1. STATIC INITIAL DATA & SECURITY -->
+    <script>
+        // --- SECURITY MODULE ---
+        (function() {
+            // Disable key combinations
+            document.onkeydown = function(e) {
+                // F12
+                if(e.keyCode == 123) return false;
+                // Ctrl+Shift+I (Inspect)
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+                // Ctrl+Shift+C (Inspect Element)
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) return false;
+                // Ctrl+Shift+J (Console)
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+                // Ctrl+U (View Source)
+                if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+                // Ctrl+S (Save)
+                if(e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
+            };
+
+            // Anti-Debugger (Subtle)
+            // This puts the browser into an infinite debugger loop if DevTools is opened.
+            // We use a function constructor to obscure it slightly.
+            setInterval(function() {
+                (function(a) {
+                    return (function(a) {
+                        return (Function('Function(arguments[0]+"' + a + '")()'))
+                    })(a)
+                })('debugger')('a')
+            }, 500); // Check every 500ms
+        })();
+
+        const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100' fill='%23f5f5f5'%3E%3Crect width='100' height='100'/%3E%3Cpath d='M50 50a15 15 0 1 0 0-30 15 15 0 0 0 0 30zm0 8c-18 0-30 10-30 20v5h60v-5c0-10-12-20-30-20z' fill='%23cccccc'/%3E%3C/svg%3E";
+
+        window.initialProjects = [
+             { id: "0", title: "House.C", type: "Single Family Residence", location: "Nantou, Taiwan", year: "2020", designBy: "@yroom.tw", photography: "@cch.tw", tag: "YE/RI", image: "https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1517555832075-973b0783c86f?q=80&w=1000&auto=format&fit=crop"], description: "結廬在人境，而無車馬喧..." },
+             { id: "1", title: "Quiet Light House", type: "Apartment", location: "Taipei", year: "2021", designBy: "@yroom", photography: "@cch", tag: "Y/ROOM", image: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop", images: ["https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1000&auto=format&fit=crop"], description: "光是空間的詩。" },
+             { id: "10", title: "Coming Soon", type: "Future", tag: "Y/R/A", isComingSoon: true }
+        ];
+
+        window.initialTexts = {
+            "hero-title-cn": "肇於意，成於形",
+            "hero-subtitle-cn": "FROM VISION TO FORM",
+            "hero-desc-cn": "YR ATELIER (Y.R.A.) 一個跨領域設計品牌。<br>它不僅是一個結合建築與室內設計的工作體系，更是一種思維方式 ——<br>在秩序與自由、形與留白、光與影之間尋找平衡。",
+            "philo-title-cn": "{ / }",
+            "philo-subtitle-cn": "在分界之間，找到自由。",
+            "philo-text-1-cn": "「 / 」是一個分界符號，也是一種意識狀態。一側代表向外的創造力與光；另一側則代表向內的覺知與靜度。",
+            "philo-text-2-cn": "「肇於意，成於形」-我們追求著是起心動念的那一瞬的靈光乍現。建築與室內的界線，是我們思考的起點。",
+            "hero-subtitle-en": "FROM VISION TO FORM.",
+            "hero-desc-en": "YR ATELIER (Y.R.A.) <br><span class='text-yr-black font-medium'>A multidisciplinary design brand. It is not merely a practice integrating architecture and interior design, but a mindset.</span>",
+            "philo-title-en": "{ / }",
+            "philo-subtitle-en": "Clarity and Calm.",
+            "philo-text-1-en": "「 / 」 is a symbol of threshold and a state of awareness. The slash \"/\" between them is not a divide, but a path of flow.",
+            "philo-text-2-en": "“FROM VISION TO FORM”—we pursue that fleeting moment of inspiration."
+        };
+
+        window.initialLeaders = {
+            "arch": { name: "陳嘉君", title: "主持建築師", edu: "台灣科技大學建築系 碩士", exp: "韻室設計\nNelson Wilmotte Architectes\n劉培森建築師事務所\n陳章安建築師事務所", photo: placeholderImg },
+            "room": { name: "趙韻蓉", title: "總監", edu: "台灣科技大學建築系 學士", exp: "韻室設計\n成舍設計\n長禾設計", photo: placeholderImg },
+            "arch_en": { name: "CHIA-CHUN CHEN", title: "Lead Architect", edu: "M.Arch, Taiwan Tech", exp: "Y/ROOM Design\nNelson Wilmotte Architectes\nLiu & Pan Architects\nChen Chang-An Architects", photo: placeholderImg },
+            "room_en": { name: "YUN-JUNG CHAO", title: "Director", edu: "B.Arch, Taiwan Tech", exp: "Y/ROOM Design\nCheng-She Design\nChang-He Design", photo: placeholderImg }
+        };
+    </script>
+
+    <!-- 2. FIREBASE MODULE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDocs, setDoc, addDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(window.__firebase_config || '{}');
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = window.__app_id || 'default-app';
+        
+        async function init() {
+            try {
+                if (window.__initial_auth_token) await signInWithCustomToken(auth, window.__initial_auth_token);
+                else await signInAnonymously(auth);
+            } catch (error) { console.error("Auth Error", error); return; }
+
+            if (!auth.currentUser) return;
+            
+            // Projects Sync
+            const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
+            onSnapshot(projectsRef, async (s) => {
+                if (s.empty && window.initialProjects) {
+                    for(let p of window.initialProjects) await setDoc(doc(projectsRef, p.id), p);
+                } else {
+                    if(s.docs.length > 0) {
+                        window.projectsData = s.docs.map(d => d.data()).sort((a,b) => parseInt(a.id) - parseInt(b.id));
+                        if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+                        if(window.refreshAdminProjects) window.refreshAdminProjects();
+                    }
+                }
+            });
+
+            const textsRef = collection(db, 'artifacts', appId, 'public', 'data', 'site_texts');
+            onSnapshot(textsRef, async (s) => {
+                if (s.empty && window.initialTexts) {
+                    for(let [k, v] of Object.entries(window.initialTexts)) await setDoc(doc(textsRef, k), { content: v });
+                } else {
+                     if(s.docs.length > 0) {
+                        const t = {}; s.docs.forEach(d => t[d.id] = d.data().content);
+                        window.siteTexts = t;
+                        if(window.renderTexts) window.renderTexts();
+                        if(window.refreshAdminTexts) window.refreshAdminTexts();
+                     }
+                }
+            });
+
+            const leadersRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaders');
+            onSnapshot(leadersRef, async (s) => {
+                if (s.empty && window.initialLeaders) {
+                    for(let [k, v] of Object.entries(window.initialLeaders)) await setDoc(doc(leadersRef, k), v);
+                } else {
+                    if(s.docs.length > 0) {
+                        const l = {}; s.docs.forEach(d => l[d.id] = d.data());
+                        window.leadersData = l;
+                        if(window.refreshAdminLeaders) window.refreshAdminLeaders();
+                    }
+                }
+            });
+
+            const contactsRef = collection(db, 'artifacts', appId, 'public', 'data', 'contacts');
+            onSnapshot(contactsRef, (s) => {
+                window.messagesData = s.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.timestamp - a.timestamp);
+                if(window.refreshAdminMessages) window.refreshAdminMessages();
+            });
+        }
+        init();
+
+        window.saveProject = async (p) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); 
+                alert("Saved Project!"); 
+                if(window.refreshAdminProjects) window.refreshAdminProjects();
+                if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
+            } catch(e) { alert("Save Error: " + e.message); console.error(e); }
+        };
+        
+        window.deleteProject = async (id) => { 
+            if(confirm("Delete?")) { 
+                try {
+                    await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); 
+                    alert("Deleted"); 
+                } catch(e) { alert("Delete Error: " + e.message); }
+            }
+        };
+        
+        window.saveSiteText = async (k, c) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); 
+                alert("Updated Text!"); 
+                if(!window.siteTexts) window.siteTexts = {};
+                window.siteTexts[k] = c;
+                if(window.renderTexts) window.renderTexts();
+            } catch(e) { alert("Save Text Error: " + e.message); }
+        };
+        
+        window.saveLeader = async (key, data) => { 
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); 
+                alert("Leader Updated!"); 
+                if(!window.leadersData) window.leadersData = {};
+                window.leadersData[key] = data;
+            } catch(e) { alert("Save Leader Error: " + e.message); }
+        };
+        
+        window.submitContact = async (data) => { 
+            try { 
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() }); 
+                return true; 
+            } catch (e) { console.error(e); return false; } 
+        };
+    </script>
 
     <!-- Portal -->
     <div id="portal" class="fixed inset-0 z-[100] bg-yr-white flex flex-col justify-center items-center overflow-hidden">
@@ -282,7 +480,7 @@
     <footer class="bg-yr-white py-8 text-center border-t border-gray-200 relative z-50"><button onclick="openAdminLogin()" class="text-gray-300 hover:text-yr-red text-xs tracking-widest cursor-pointer transition-colors">Y.R.A</button></footer>
     
     <!-- Admin Modal, Dashboard, Edit Modal (Same as before) -->
-    <div id="login-modal" class="admin-modal"><div class="bg-white p-8 w-[90%] max-w-[400px] text-center shadow-2xl relative"><div onclick="closeAdminLogin()" class="absolute top-4 right-4 cursor-pointer">✕</div><h3 class="text-xl font-light tracking-widest mb-6">BACKEND LOGIN</h3><input type="text" id="admin-id" placeholder="ID" class="w-full border-b border-gray-300 p-2 mb-4 outline-none focus:border-yr-red tracking-widest"><input type="password" id="admin-pw" placeholder="PASSWORD" class="w-full border-b border-gray-300 p-2 mb-8 outline-none focus:border-yr-red tracking-widest"><button onclick="attemptLogin()" class="bg-yr-black text-white px-6 py-2 tracking-widest hover:bg-yr-red transition-colors w-full">ENTER</button></div></div>
+    <div id="login-modal" class="admin-modal"><div class="bg-white p-8 w-[90%] max-w-[400px] text-center shadow-2xl relative"><div onclick="closeAdminLogin()" class="absolute top-4 right-4 cursor-pointer">✕</div><h3 class="text-xl font-light tracking-widest mb-6">BACKEND LOGIN</h3><input type="text" id="admin-id" placeholder="ID" autocomplete="off" class="w-full border-b border-gray-300 p-2 mb-4 outline-none focus:border-yr-red tracking-widest"><input type="password" id="admin-pw" placeholder="PASSWORD" autocomplete="new-password" class="w-full border-b border-gray-300 p-2 mb-8 outline-none focus:border-yr-red tracking-widest"><button onclick="attemptLogin()" class="bg-yr-black text-white px-6 py-2 tracking-widest hover:bg-yr-red transition-colors w-full">ENTER</button></div></div>
     <div id="admin-dashboard" class="overlay-fixed bg-yr-white z-[90]"><div onclick="closeAdminDashboard()" class="close-btn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div><div class="w-full h-full flex flex-col"><div class="h-[10vh] flex items-center justify-center border-b border-gray-200 bg-white"><h2 class="text-fluid-lg tracking-widest">ADMIN DASHBOARD</h2></div><div class="flex flex-1 overflow-hidden"><div class="w-1/4 bg-white border-r border-gray-200 flex flex-col p-6 gap-4"><button onclick="switchAdminTab('projects')" id="tab-projects" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest active">PROJECTS</button><button onclick="switchAdminTab('texts')" id="tab-texts" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">SITE TEXTS</button><button onclick="switchAdminTab('leaders')" id="tab-leaders" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">LEADERS</button><button onclick="switchAdminTab('messages')" id="tab-messages" class="dashboard-tab text-left py-2 text-gray-500 hover:text-yr-red tracking-widest">MESSAGES</button></div><div class="w-3/4 p-8 overflow-y-auto bg-gray-50"><div id="panel-projects"><button onclick="addNewProject()" class="mb-8 bg-yr-red text-white px-4 py-2 text-sm tracking-widest hover:bg-black transition-colors">+ NEW PROJECT</button><div id="admin-projects-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div><div id="panel-texts" class="hidden"><div id="admin-texts-list" class="space-y-6"></div></div><div id="panel-leaders" class="hidden"><div id="admin-leaders-list" class="space-y-8"></div></div><div id="panel-messages" class="hidden"><div id="admin-messages-list" class="space-y-4"></div></div></div></div></div></div>
     <div id="edit-project-modal" class="admin-modal z-[100]"><div class="bg-white p-8 w-[90%] max-w-[600px] max-h-[90vh] overflow-y-auto shadow-2xl relative"><div onclick="closeEditModal()" class="absolute top-4 right-4 cursor-pointer text-xl">✕</div><h3 class="text-xl font-light tracking-widest mb-6 text-center" id="edit-modal-title">EDIT PROJECT</h3><div class="space-y-4"><input type="hidden" id="edit-p-id"><div><label class="text-xs text-gray-400">TITLE</label><input id="edit-p-title" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">TYPE</label><input id="edit-p-type" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">LOCATION</label><input id="edit-p-location" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">YEAR</label><input id="edit-p-year" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">DESIGN BY</label><input id="edit-p-design" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">PHOTOGRAPHY</label><input id="edit-p-photo" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">TAG (YE/RI or Y/ROOM)</label><input id="edit-p-tag" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">MAIN IMAGE URL</label><input id="edit-p-image" class="w-full border p-2"></div><div><label class="text-xs text-gray-400">GALLERY URLS (Comma separated)</label><textarea id="edit-p-images" class="w-full border p-2 h-20"></textarea></div><div><label class="text-xs text-gray-400">DESCRIPTION (HTML Allowed)</label><textarea id="edit-p-desc" class="w-full border p-2 h-32"></textarea></div><div class="flex items-center gap-2"><input type="checkbox" id="edit-p-coming"><label class="text-sm">Coming Soon Mode</label></div><button onclick="window.processProjectSave()" class="w-full bg-yr-black text-white py-3 mt-4 tracking-widest hover:bg-yr-red">SAVE</button></div></div></div>
 
@@ -291,9 +489,10 @@
         function loadSafeData(key, initial) {
             try {
                 const stored = localStorage.getItem(key);
-                return stored ? JSON.parse(stored) : initial;
+                // Simple Base64 Decode for Obfuscation
+                return stored ? JSON.parse(atob(stored)) : initial;
             } catch (e) {
-                console.warn("LocalStorage error:", e);
+                console.warn("LocalStorage error or invalid data, resetting:", e);
                 return initial;
             }
         }
@@ -314,8 +513,9 @@
             setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
         };
 
+        // Save with Base64 Encoding
         window.saveToLocal = function(key, data) {
-            try { localStorage.setItem(key, JSON.stringify(data)); } catch(e){ console.error(e); }
+            try { localStorage.setItem(key, btoa(JSON.stringify(data))); } catch(e){ console.error(e); }
         };
 
         // --- Data Adapter (LocalStorage Implementation) ---
@@ -449,36 +649,25 @@
         window.closeProjectDetail = () => document.getElementById('project-detail-overlay').classList.remove('open');
         window.changeMainImage = (src, index) => { const main = document.getElementById('detail-main-image'); main.classList.add('opacity-0'); setTimeout(() => { main.src = src; main.classList.remove('opacity-0'); }, 200); document.getElementById('image-counter').innerText = index + 1; document.querySelectorAll('.thumbnail-item').forEach((t, i) => t.className = `thumbnail-item w-16 h-12 md:w-24 md:h-16 flex-shrink-0 cursor-pointer border border-transparent hover:border-white/50 transition-all ${i === index ? 'border-yr-red opacity-100' : 'opacity-60 hover:opacity-100'}`); };
 
-        // Contact Modal Logic
-        window.openContactModal = () => { document.getElementById('contact-modal').classList.add('active'); };
-        window.closeContactModal = () => { document.getElementById('contact-modal').classList.remove('active'); };
-        // Fix: Bridging function
-        window.processContactForm = async () => { 
-            const name = document.getElementById('contact-name').value; 
-            const phone = document.getElementById('contact-phone').value; 
-            const email = document.getElementById('contact-email').value; 
-            const message = document.getElementById('contact-message').value; 
-            if (!name || !email || !message) { alert('請填寫必要欄位 (姓名, Email, 留言)'); return; } 
-            
-            const success = await window.dbAdapter.sendMessage({ name, phone, email, message }); 
-            
-            if (success) { 
-                alert('訊息已發送！(Message Sent)'); 
-                closeContactModal(); 
-                document.getElementById('contact-name').value = ''; 
-                document.getElementById('contact-phone').value = ''; 
-                document.getElementById('contact-email').value = ''; 
-                document.getElementById('contact-message').value = ''; 
-                window.forceUpdateUI();
+        // --- Admin UI ---
+        window.openAdminLogin = () => {
+            document.getElementById('admin-id').value = '';
+            document.getElementById('admin-pw').value = '';
+            document.getElementById('login-modal').classList.add('active');
+        };
+        window.closeAdminLogin = () => {
+            document.getElementById('admin-id').value = ''; // Clear on close too for safety
+            document.getElementById('admin-pw').value = '';
+            document.getElementById('login-modal').classList.remove('active');
+        };
+        window.attemptLogin = () => { 
+            if(document.getElementById('admin-id').value === 'bala0105' && document.getElementById('admin-pw').value === 'bala0105') { 
+                window.closeAdminLogin(); 
+                openAdminDashboard(); 
             } else { 
-                alert('發送失敗，請稍後再試。(Failed to send)'); 
+                alert("Failed"); 
             } 
         };
-
-        // --- Admin UI ---
-        window.openAdminLogin = () => document.getElementById('login-modal').classList.add('active');
-        window.closeAdminLogin = () => document.getElementById('login-modal').classList.remove('active');
-        window.attemptLogin = () => { if(document.getElementById('admin-id').value === 'bala0105' && document.getElementById('admin-pw').value === 'bala0105') { closeAdminLogin(); openAdminDashboard(); } else alert("Failed"); };
         window.openAdminDashboard = () => { document.getElementById('admin-dashboard').classList.add('open'); window.forceUpdateUI(); };
         window.closeAdminDashboard = () => document.getElementById('admin-dashboard').classList.remove('open');
         window.switchAdminTab = (t) => { document.querySelectorAll('.dashboard-tab').forEach(e => e.classList.remove('active')); document.getElementById(`tab-${t}`).classList.add('active'); ['projects','texts','leaders', 'messages'].forEach(p => document.getElementById(`panel-${p}`).classList.add('hidden')); document.getElementById(`panel-${t}`).classList.remove('hidden'); };

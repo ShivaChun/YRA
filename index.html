@@ -29,27 +29,37 @@
         .portal-fade-out { opacity: 0; pointer-events: none; transition: opacity 0.8s ease-in-out; }
         .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 1.0s ease-out, transform 1.0s ease-out; }
         .animate-on-scroll.is-visible { opacity: 1; transform: translateY(0); }
+        
         .logo-stroke { fill: none; stroke: currentColor; stroke-dasharray: 4000; stroke-dashoffset: 4000; animation: drawStroke 4s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate; }
         .logo-fill { fill: currentColor; opacity: 0.1; animation: fadeInFill 4s infinite alternate; }
         @keyframes drawStroke { 0% { stroke-dashoffset: 4000; opacity: 0.3; } 100% { stroke-dashoffset: 0; opacity: 1; } }
         @keyframes fadeInFill { 0% { opacity: 0; } 100% { opacity: 0.15; } }
+        
         .portal-interactive-group { cursor: default; display: flex; align-items: center; justify-content: center; gap: 1vw; }
         .portal-letter { display: inline-block; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease; }
         .portal-interactive-group:hover .portal-letter { color: #B85742; transform: translateY(-8px); }
         .portal-slash-svg line { stroke: #A0A0A0; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20; stroke-dashoffset: 20; animation: slashFlow 3s infinite ease-in-out; transition: stroke 0.3s ease; }
         .portal-interactive-group:hover .portal-slash-svg line { stroke: #B85742; }
         @keyframes slashFlow { 0% { stroke-dashoffset: 20; opacity: 0; } 20% { opacity: 1; } 40% { stroke-dashoffset: 0; } 60% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -20; opacity: 0; } }
+
+        /* Menu Slash Animation */
+        .menu-link-group .slash-line { stroke: #A0A0A0; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0; stroke-dashoffset: 0; transition: stroke 0.3s ease; }
+        .menu-link-group:hover .slash-line { stroke: #B85742; stroke-dasharray: 20; animation: slashFlow 1.5s infinite ease-in-out; }
+
         .hero-float { animation: floating 4s ease-in-out infinite; }
         @keyframes floating { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
         .neon-text { animation: neonFlicker 8s infinite steps(1); }
         @keyframes neonFlicker { 0%, 30%, 32%, 34%, 36%, 100% { opacity: 1; text-shadow: 0 0 0 transparent; } 31%, 33%, 35% { opacity: 0.3; } 31.5%, 33.5% { opacity: 0.1; } }
+
         .structure-svg-path { fill: none; stroke-width: 50; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 5000; stroke-dashoffset: 5000; animation: drawStructure 2s ease-out forwards; }
         .structure-svg-fill { fill: #F5F5F5; opacity: 0; animation: fillStructure 1s ease-out 1.5s forwards; }
         @keyframes drawStructure { to { stroke-dashoffset: 0; } }
         @keyframes fillStructure { to { opacity: 1; } }
+
         .link-underline { position: relative; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; }
         .link-underline::after { content: ''; position: absolute; width: 0%; height: 1px; bottom: -4px; left: 0; background-color: #B85742; transition: width 0.4s ease-out; }
         .link-underline:hover::after { width: 100%; }
+        
         .bg-grid-pattern { background-size: 40px 40px; background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px); }
         #mobile-menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 40; transform: translateX(100%); transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1); display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #mobile-menu.open { transform: translateX(0); }
@@ -57,32 +67,38 @@
         .hamburger-active .line-1 { transform: translateY(7px) rotate(45deg); }
         .hamburger-active .line-2 { opacity: 0; }
         .hamburger-active .line-3 { transform: translateY(-7px) rotate(-45deg); }
+        
         .overlay-fixed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 60; overflow-y: auto; transform: translateY(100%); transition: transform 0.6s cubic-bezier(0.77, 0, 0.175, 1); }
         .overlay-fixed.open { transform: translateY(0); }
         .close-btn { position: absolute; top: 2rem; right: 2rem; z-index: 70; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #ddd; transition: all 0.3s ease; }
         .close-btn:hover { background-color: #B85742; border-color: #B85742; color: white; }
         .local-transition { position: absolute; inset: 0; background-color: #fff; z-index: 20; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .local-transition.active { opacity: 1; pointer-events: auto; }
+        
         #transition-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #F5F5F5; z-index: 80; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         #transition-overlay.active { opacity: 1; pointer-events: auto; }
+
         .trans-svg-path { fill: none; stroke: #2E2E2E; stroke-width: 25; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6000; stroke-dashoffset: 6000; }
         .trans-anim-active .trans-svg-path { animation: drawTransStroke 1.8s ease-in-out forwards; }
         @keyframes drawTransStroke { 0% { stroke-dashoffset: 6000; opacity: 0.5; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+
         .admin-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .admin-modal.active { display: flex; }
         .dashboard-tab.active { border-bottom: 2px solid #B85742; color: #B85742; }
         .project-card:hover .project-img { transform: scale(1.05); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .detail-content { position: relative; width: 100%; min-height: 100%; }
-        
-        /* Menu Slash Hover */
-        .menu-link-group .slash-line { stroke: #A0A0A0; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 0; stroke-dashoffset: 0; transition: stroke 0.3s ease; }
-        .menu-link-group:hover .slash-line { stroke: #B85742; stroke-dasharray: 20; animation: slashFlow 1.5s infinite ease-in-out; }
 
+        #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; pointer-events: none; }
+        .toast { background: rgba(30, 30, 30, 0.9); color: white; padding: 12px 24px; border-radius: 4px; margin-top: 10px; opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease; transform: translateY(10px); font-size: 14px; letter-spacing: 1px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        
         :root { --section-padding-x: 4vw; }
     </style>
 </head>
 <body class="bg-yr-white text-yr-black selection:bg-yr-red selection:text-white flex flex-col min-h-screen">
+
+    <div id="toast-container"></div>
 
     <!-- 1. STATIC INITIAL DATA -->
     <script>
@@ -120,9 +136,19 @@
         window.projectsData = window.initialProjects;
         window.siteTexts = window.initialTexts;
         window.leadersData = window.initialLeaders;
+
+        window.showToast = function(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            container.appendChild(toast);
+            requestAnimationFrame(() => { toast.classList.add('show'); });
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+        };
     </script>
 
-    <!-- 2. FIREBASE MODULE -->
+    <!-- 2. FIREBASE MODULE - Consolidated Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -142,6 +168,7 @@
 
             if (!auth.currentUser) return;
             
+            // Listeners
             const projectsRef = collection(db, 'artifacts', appId, 'public', 'data', 'projects');
             onSnapshot(projectsRef, async (s) => {
                 if (s.empty && window.initialProjects) {
@@ -190,48 +217,57 @@
         }
         init();
 
-        window.saveProject = async (p) => { 
-            try {
-                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p); 
-                alert("Saved Project!"); 
-                if(window.refreshAdminProjects) window.refreshAdminProjects();
-                if(window.renderFrontendProjects) window.renderFrontendProjects(window.projectsData);
-            } catch(e) { alert("Save Error: " + e.message); console.error(e); }
-        };
+        // --- GLOBAL BACKEND FUNCTIONS (Correctly utilizing Module Scope) ---
         
-        window.deleteProject = async (id) => { 
-            if(confirm("Delete?")) { 
-                try {
-                    await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id)); 
-                    alert("Deleted"); 
-                } catch(e) { alert("Delete Error: " + e.message); }
+        window.saveProjectFromAdmin = async (p) => {
+             try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), p.id), p);
+                window.showToast("Project Saved!");
+            } catch(e) {
+                console.error(e);
+                window.showToast("Error: " + e.message);
             }
         };
-        
-        window.saveSiteText = async (k, c) => { 
-            try {
-                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), k), { content: c }); 
-                alert("Updated Text!"); 
-                if(!window.siteTexts) window.siteTexts = {};
-                window.siteTexts[k] = c;
-                if(window.renderTexts) window.renderTexts();
-            } catch(e) { alert("Save Text Error: " + e.message); }
+
+        window.deleteProjectFromAdmin = async (id) => {
+             try {
+                await deleteDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), id));
+                window.showToast("Project Deleted");
+            } catch(e) {
+                console.error(e);
+                window.showToast("Delete Error: " + e.message);
+            }
         };
-        
-        window.saveLeader = async (key, data) => { 
+
+        window.saveTextFromAdmin = async (key, content) => {
             try {
-                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data); 
-                alert("Leader Updated!"); 
-                if(!window.leadersData) window.leadersData = {};
-                window.leadersData[key] = data;
-            } catch(e) { alert("Save Leader Error: " + e.message); }
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'site_texts'), key), { content: content });
+                window.showToast("Text Updated!");
+            } catch(e) {
+                console.error(e);
+                window.showToast("Save Error: " + e.message);
+            }
         };
-        
-        window.submitContact = async (data) => { 
-            try { 
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() }); 
-                return true; 
-            } catch (e) { console.error(e); return false; } 
+
+        window.saveLeaderFromAdmin = async (key, data) => {
+            try {
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'leaders'), key), data);
+                window.showToast("Leader Updated!");
+            } catch(e) {
+                console.error(e);
+                window.showToast("Save Error: " + e.message);
+            }
+        };
+
+        window.sendContactMessage = async (data) => {
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'contacts'), { ...data, timestamp: Date.now() });
+                return true;
+            } catch (e) {
+                console.error(e);
+                window.showToast("Send Error: " + e.message);
+                return false;
+            }
         };
     </script>
 
@@ -241,8 +277,8 @@
             <svg viewBox="37500 32600 2150 2100" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-2xl"><g><polygon class="logo-fill" points="39589.06,32651.66 38610.11,32651.66 38610.11,33281.13 39129.42,33281.13 "/><polygon class="logo-fill" points="38665.88,33551.24 37627.67,32652.13 37571.88,32652.13 37571.88,33550.69 38610.09,34449.8 38665.88,34449.8 "/><polyline class="logo-stroke" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" points="37571.88,32652.13 38610.09,33551.24 38610.09,34648.31 "/><polyline class="logo-stroke" stroke-width="80" stroke-linecap="round" stroke-linejoin="round" points="38610.11,32651.66 39589.06,32651.66 38934.65,33551.37 39284.08,33853.87 "/><polygon class="logo-stroke" stroke-width="20" points="38934.65,34180.84 39589.06,33281.13 39589.06,32651.66 38934.65,33551.37 "/><polygon class="logo-stroke" stroke-width="20" points="38934.65,33551.37 38934.65,34180.84 39284.08,34483.34 39284.08,33853.87 "/></g></svg>
         </div>
         <div class="portal-interactive-group text-fluid-xl tracking-[0.2em] font-light mb-2 text-center h-[40px]">
-            <span class="portal-letter">Y</span><svg class="portal-slash-svg w-[20px] h-[30px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>
-            <span class="portal-letter">R</span><svg class="portal-slash-svg w-[20px] h-[30px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>
+            <span class="portal-letter">Y</span><svg class="portal-slash-svg w-[20px] h-[30px]" viewBox="0 0 10 20"><line x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>
+            <span class="portal-letter">R</span><svg class="portal-slash-svg w-[20px] h-[30px]" viewBox="0 0 10 20"><line x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>
             <span class="portal-letter">A</span>
         </div>
         <p class="text-fluid-xs text-gray-400 tracking-[0.4em] mb-16 pointer-events-none text-center">FROM VISION TO FORM.</p>
@@ -265,16 +301,16 @@
             </button>
             <div class="hidden lg:flex items-center">
                 <nav id="nav-cn" class="flex gap-[3vw] lg:gap-10 lang-nav hidden items-center mr-6 lg:mr-10">
-                    <a href="#philosophy-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>底蘊<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#structure-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>架構<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#projects-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>作品<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#contact-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>聯繫<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#philosophy-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>底蘊<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#structure-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>架構<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#projects-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>作品<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#contact-cn" class="menu-link-group link-underline text-fluid-sm font-medium tracking-widest text-gray-500 hover:text-yr-red whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>聯繫<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
                 </nav>
                 <nav id="nav-en" class="flex gap-[3vw] lg:gap-10 lang-nav hidden items-center mr-6 lg:mr-10">
-                    <a href="#philosophy-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Philosophy<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#structure-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Structure<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#projects-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Projects<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
-                    <a href="#contact-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Contact<svg class="portal-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#philosophy-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Philosophy<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#structure-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Structure<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#projects-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Projects<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
+                    <a href="#contact-en" class="menu-link-group link-underline text-fluid-xs font-medium tracking-widest text-gray-500 hover:text-yr-red uppercase whitespace-nowrap"><svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg>Contact<svg class="menu-slash-svg w-[8px] h-[16px]" viewBox="0 0 10 20"><line class="slash-line" x1="10" y1="0" x2="0" y2="20" vector-effect="non-scaling-stroke" /></svg></a>
                 </nav>
                 <div class="flex gap-4 items-center border-l border-gray-300 pl-4 lg:pl-6">
                     <a href="https://www.facebook.com/yroom.tc" target="_blank" class="text-gray-400 hover:text-yr-red transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
@@ -366,6 +402,7 @@
                 </div>
             </section>
             
+            <!-- CN Structure -->
             <section id="structure-cn" class="py-[10vh] px-[4vw] bg-yr-white scroll-mt-20">
                 <div class="w-full animate-on-scroll"><div class="text-center mb-[5vh]"><h2 class="text-fluid-xl font-light tracking-widest text-yr-black">品牌架構</h2></div>
                     <div class="flex flex-col md:flex-row justify-center items-stretch w-full gap-4 md:gap-0 min-h-[500px]">

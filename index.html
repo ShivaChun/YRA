@@ -165,6 +165,7 @@
       const Visualizer3D = ({ inputs, res, onUpdateBaseDim }) => {
         const [animate, setAnimate] = useState(false);
         const [showCheckLines, setShowCheckLines] = useState(false);
+        const [showWeiLao, setShowWeiLao] = useState(false); 
         const [isDarkMode, setIsDarkMode] = useState(false);
         
         // Interaction State
@@ -180,7 +181,6 @@
         const [isMobile, setIsMobile] = useState(false);
         const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
-        const floorsAbove = Math.max(1, Math.ceil(res.floorsAbove || 1));
         const floorsBelow = Math.max(0, parseInt(inputs.floorsBelow) || 0);
 
         useEffect(() => {
@@ -194,7 +194,7 @@
           setAnimate(true);
           const timer = setTimeout(() => setAnimate(false), 1000);
           return () => clearTimeout(timer);
-        }, [floorsAbove]);
+        }, [res.floorsAbove]);
 
         useEffect(() => {
           const element = viewportRef.current;
@@ -271,45 +271,104 @@
         const backM = parseFloat(inputs.backYardDepth) || 0;
         const sideM = parseFloat(inputs.sideYardDepth) || 0;
         const sideDir = inputs.sideYardDirection || 'right';
+        const roadW_M = parseFloat(inputs.roads.find(r => r.type === 'primary')?.width || inputs.roads[0]?.width || 6);
+        const byRatio = parseFloat(inputs.minBackyardDepthRatio) || 0;
 
         const frontPx = frontM * scale;
         const backPx = backM * scale;
         const sidePx = sideM * scale;
+        const roadW_Px = roadW_M * scale;
 
         // Building Dimensions (Footprint)
-        let bW = w, bD = d;
-        bD = Math.max(0, d - frontPx - backPx);
-        bW = Math.max(0, w - sidePx);
-
-        const shiftY = (backPx - frontPx) / 2;
+        // Shift calculations for basement & visual alignment
         const shiftX = sideDir === 'left' ? (sidePx / 2) : (-sidePx / 2);
 
-        // Floors logic
-        const floorHeightPx = Math.min(40, (250) / (floorsAbove + floorsBelow));
-        const floorHeightActual = Math.max(20, floorHeightPx);
-        
-        const floorLayers = [];
-        let currentZ = 0;
-        
-        for (let i = 0; i < floorsAbove; i++) {
-          const isTop = i === floorsAbove - 1;
-          
-          const decimal = res.calculatedFloors % 1; 
-          let layerScale = 1;
-          
-          if (isTop && decimal > 0.01) {
-             layerScale = Math.sqrt(decimal);
-          }
+        // Floors logic (Massing Simulation)
+        const massingLayers = useMemo(() => {
+            const layers = [];
+            // Calculate target area above ground (TotalCFA - Basement)
+            // Assuming res.totalCFA is total lawful floor area.
+            let remainingAreaM2 = Math.max(0, (res.totalCFA || 0) - (res.totalBasementArea || 0));
+            let currentZM = 0;
+            let floorCount = 0;
+            const maxSimulatedFloors = 100; // Safety limit
 
-          floorLayers.push({
-            id: i === 0 ? 'GF' : `${i}F`,
-            z: currentZ,
-            height: floorHeightActual,
-            scale: layerScale 
-          });
-          currentZ += floorHeightActual;
-        }
-        const totalH_Px = currentZ;
+            // Building bounds in Meters relative to plot
+            // Plot Y range: 0 (Back) to baseDepthM (Front)
+            const buildBackM = backM;
+            const buildFrontM = baseDepthM - frontM;
+            const buildWidthM = Math.max(0, baseWidthM - sideM);
+
+            // Check Line Origins (Y coordinates in Meters)
+            const originHeightRatioY = baseDepthM + roadW_M; // Road far edge
+            const originWeiLaoY = baseDepthM + roadW_M / 2; // Road center
+
+            while (remainingAreaM2 > 0.1 && floorCount < maxSimulatedFloors) {
+                const h = (floorCount === 0) ? (parseFloat(inputs.floorHeight1F) || 4.2) : (parseFloat(inputs.floorHeightOther) || 3.6);
+                
+                // Calculate cuts at the CEILING of this floor (conservative check)
+                const checkZ = currentZM + h;
+                
+                let limitFront = buildFrontM;
+                let limitBack = buildBackM;
+
+                // 1. Height Ratio Cut
+                if (showCheckLines) {
+                    // Slope 3.6. Origin Road Far Edge.
+                    // Y = Origin - Z / 3.6
+                    const cutY = originHeightRatioY - (checkZ / 3.6);
+                    limitFront = Math.min(limitFront, cutY);
+                }
+
+                // 2. Wei-Lao Cut
+                if (showCheckLines && showWeiLao) {
+                    // Slope 5.0. Origin Road Center.
+                    // Y = Origin - Z / 5.0
+                    const cutY = originWeiLaoY - (checkZ / 5.0);
+                    limitFront = Math.min(limitFront, cutY);
+                }
+
+                // 3. Backyard Ratio Cut
+                if (showCheckLines && byRatio > 0) {
+                    // Slope byRatio. Origin Back (0).
+                    // Y = 0 + Z / Ratio
+                    const cutY = checkZ / byRatio;
+                    limitBack = Math.max(limitBack, cutY);
+                }
+
+                // Calculate valid depth
+                const validDepthM = Math.max(0, limitFront - limitBack);
+                const floorAreaM2 = validDepthM * buildWidthM;
+
+                if (floorAreaM2 <= 1.0) {
+                    // Floor area too small to be viable, stop building up
+                    break; 
+                }
+
+                // Add layer
+                layers.push({
+                    id: floorCount === 0 ? 'GF' : `${floorCount}F`,
+                    z: currentZM * scale, // px
+                    height: Math.max(10, h * scale * 0.9), // Visual height slightly reduced for gap effect
+                    depthPx: validDepthM * scale,
+                    widthPx: buildWidthM * scale,
+                    // Center Y of this layer relative to Plot Center
+                    // Layer Center Y (M) = limitBack + validDepthM/2
+                    // Plot Center Y (M) = baseDepthM / 2
+                    shiftYPx: ((limitBack + validDepthM / 2) - (baseDepthM / 2)) * scale
+                });
+
+                remainingAreaM2 -= floorAreaM2;
+                currentZM += h;
+                floorCount++;
+            }
+
+            return { layers, totalFloors: floorCount, totalHeight: currentZM };
+        }, [res.totalCFA, res.totalBasementArea, baseDepthM, baseWidthM, frontM, backM, sideM, roadW_M, inputs.floorHeight1F, inputs.floorHeightOther, showCheckLines, showWeiLao, byRatio, scale]);
+
+        const floorLayers = massingLayers.layers;
+        const visualTotalH_Px = massingLayers.totalHeight * scale;
+        const visualFloorsAbove = massingLayers.totalFloors;
 
         // Colors
         const colors = {
@@ -322,26 +381,13 @@
           stroke: showCheckLines ? "#fb923c" : (isDarkMode ? "#94a3b8" : "#a8a29e")
         };
 
-        const primaryRoad = inputs.roads.find(r => r.type === 'primary') || inputs.roads[0];
-        const roadW_M = primaryRoad ? parseFloat(primaryRoad.width) : 6;
-        const roadW_Px = roadW_M * scale;
-
-        // --- 檢討線參數修正 ---
-        
-        // 1. 高度比: 1 : 3.6 (住宅區常見) 
-        // 基準點: 面前道路對側境界線 (Road Far Edge)
+        // --- 檢討線參數 ---
         const limitH_HeightRatio_M = 3.6 * (roadW_M + frontM);
         const limitH_HeightRatio_Px = limitH_HeightRatio_M * scale;
 
-        // 2. 危老檢討: H <= 5 * (0.5*Road + Front)
-        // 基準點: 面前道路中心線 (Road Center Line)
         const limitH_WeiLao_M = 5 * (0.5 * roadW_M + frontM);
         const limitH_WeiLao_Px = limitH_WeiLao_M * scale;
 
-        // 3. 後院比
-        // 基準點: 後面基地線 (Back Property Line)
-        // 修正：依照要求，輸入為比值 (H/D)，所以 H = Ratio * D
-        const byRatio = parseFloat(inputs.minBackyardDepthRatio) || 0;
         const limitH_Backyard_M = byRatio * backM; 
         const limitH_Backyard_Px = limitH_Backyard_M * scale;
 
@@ -424,7 +470,7 @@
                       transition: isDragging ? 'none' : 'transform 0.1s ease-out' 
                     }}>
                        
-                       {/* Base Land Container: width=w, height=d. Coordinate (0,0) is Top-Left (Back of lot). Coordinate (w,d) is Bottom-Right (Front of lot). */}
+                       {/* Base Land */}
                        <div style={{ 
                            position: 'relative', 
                            width: `${w}px`, 
@@ -449,19 +495,19 @@
                           {/* Basement */}
                           {Array.from({length: floorsBelow}).map((_, i) => (
                             <div key={`bm-${i}`} className={`absolute border border-dashed ${isDarkMode ? 'border-slate-600 bg-slate-800/50' : 'border-stone-400 bg-stone-200/50'}`}
-                                 style={{ width: `${w*0.8}px`, height: `${d*0.8}px`, left: '50%', top: '50%', transform: `translate(-50%, -50%) translateZ(${-(i+1)*floorHeightActual}px)` }}>
+                                 style={{ width: `${w*0.8}px`, height: `${d*0.8}px`, left: '50%', top: '50%', transform: `translate(-50%, -50%) translateZ(${-(i+1)*Math.max(20, 3.6*scale*0.8)}px)` }}>
                             </div>
                           ))}
 
-                          {/* Floors */}
+                          {/* Floors (Dynamic Massing) */}
                           {floorLayers.map((layer, i) => (
                             <BuildingLayer 
                               key={`fl-${i}`}
-                              width={bW * layer.scale}
-                              depth={bD * layer.scale}
+                              width={layer.widthPx}
+                              depth={layer.depthPx}
                               height={layer.height}
                               x={shiftX}
-                              y={shiftY}
+                              y={layer.shiftYPx}
                               z={layer.z}
                               color={colors.floor}
                               strokeColor={colors.stroke}
@@ -470,34 +516,33 @@
                               visible={true}
                               isSlabMode={!showCheckLines}
                               animate={animate}
-                              delay={i * 100}
+                              delay={i * 50}
                               isDarkMode={isDarkMode}
                             />
                           ))}
 
-                          {/* 3D Leaders and Labels - 1F~XF */}
+                          {/* 3D Leaders and Labels - Dynamic Height */}
                           <div className="absolute" style={{ 
                                 left: '50%', top: '50%', 
-                                transform: `translate3d(${shiftX + bW/2 + 40}px, ${shiftY + bD/2}px, 0px) rotateX(-90deg) rotateY(0deg)` 
+                                transform: `translate3d(${shiftX + w/2 + 40}px, ${d/2}px, 0px) rotateX(-90deg) rotateY(0deg)` 
                             }}>
-                                <div className={`border-l-[3px] ${isDarkMode ? 'border-stone-400' : 'border-stone-600'}`} style={{ height: `${totalH_Px}px`, position: 'absolute', bottom: 0 }}></div>
+                                <div className={`border-l-[3px] ${isDarkMode ? 'border-stone-400' : 'border-stone-600'}`} style={{ height: `${visualTotalH_Px}px`, position: 'absolute', bottom: 0 }}></div>
                                 <div className={`absolute bottom-0 left-[-3px] w-2 h-2 rounded-full ${isDarkMode ? 'bg-stone-400' : 'bg-stone-600'}`}></div>
-                                <div className="absolute left-[-6px]" style={{ bottom: `${totalH_Px - 2}px` }}>
+                                <div className="absolute left-[-6px]" style={{ bottom: `${visualTotalH_Px - 2}px` }}>
                                   <div className={`w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[10px] ${isDarkMode ? 'border-b-stone-400' : 'border-b-stone-600'}`}></div>
                                 </div>
                                 <div className={`absolute left-4 text-xl font-bold whitespace-nowrap ${isDarkMode ? 'text-stone-200' : 'text-stone-700'}`}
                                      style={{ 
-                                       bottom: `${totalH_Px / 2}px`,
+                                       bottom: `${visualTotalH_Px / 2}px`,
                                        transform: 'translateY(50%)' 
                                      }}>
-                                   1F~{floorsAbove}F
+                                   1F~{visualFloorsAbove}F
                                 </div>
                           </div>
 
-                          {/* Check Lines - Corrected Coordinates based on y=d being Front/Bottom and y=0 being Back/Top */}
+                          {/* Check Lines */}
                           {showCheckLines && (
                              <>
-                                {/* 1. 高度比: Road Far Edge (y = d + roadW) to Building Line (y = d - front) */}
                                 <CheckLine 
                                   start={{ x: w/2, y: d + roadW_Px, z: 0 }}
                                   end={{ x: w/2, y: d - frontPx, z: limitH_HeightRatio_Px }}
@@ -505,28 +550,31 @@
                                   label="高度比"
                                   baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ}
                                   visible={true} dashed={true} thick={true} isDarkMode={isDarkMode}
-                                />
-
-                                {/* 2. 危老檢討: Road Center (y = d + roadW/2) to Building Line (y = d - front) */}
-                                <CheckLine 
-                                  start={{ x: w/2, y: d + roadW_Px/2, z: 0 }}
-                                  end={{ x: w/2, y: d - frontPx, z: limitH_WeiLao_Px }}
-                                  color={isDarkMode ? "#a855f7" : "#8b5cf6"}
-                                  label="危老檢討"
-                                  baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ}
-                                  visible={true} dashed={true} thick={true} isDarkMode={isDarkMode}
                                   labelPosRatio={0.2}
                                 />
 
-                                {/* 3. 後院比: Back Property Line (y = 0) to Building Line Back (y = backPx) */}
-                                <CheckLine 
-                                  start={{ x: w/2, y: 0, z: 0 }}
-                                  end={{ x: w/2, y: backPx, z: limitH_Backyard_Px }}
-                                  color={isDarkMode ? "#38bdf8" : "#0ea5e9"}
-                                  label="後院比"
-                                  baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ}
-                                  visible={true} dashed={true} thick={true} isDarkMode={isDarkMode}
-                                />
+                                {showWeiLao && (
+                                  <CheckLine 
+                                    start={{ x: w/2, y: d + roadW_Px/2, z: 0 }}
+                                    end={{ x: w/2, y: d - frontPx, z: limitH_WeiLao_Px }}
+                                    color={isDarkMode ? "#a855f7" : "#8b5cf6"}
+                                    label="危老檢討"
+                                    baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ}
+                                    visible={true} dashed={true} thick={true} isDarkMode={isDarkMode}
+                                    labelPosRatio={0.2}
+                                  />
+                                )}
+
+                                {byRatio > 0 && ( 
+                                  <CheckLine 
+                                    start={{ x: w/2, y: 0, z: 0 }}
+                                    end={{ x: w/2, y: backPx, z: limitH_Backyard_Px }}
+                                    color={isDarkMode ? "#38bdf8" : "#0ea5e9"}
+                                    label="後院比"
+                                    baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ}
+                                    visible={true} dashed={true} thick={true} isDarkMode={isDarkMode}
+                                  />
+                                )}
                              </>
                           )}
                        </div>
@@ -542,9 +590,9 @@
                                  <LegendItem color={isDarkMode?"bg-emerald-500/20 border-emerald-500":"bg-emerald-200 border-emerald-300"} label="後院" value={`${inputs.backYardDepth||0}m`} textColor={isDarkMode?"text-slate-200":"text-stone-600"} valueColor={isDarkMode?"text-slate-400":"text-stone-400"} />
                                  <LegendItem color={isDarkMode?"bg-sky-500/20 border-sky-500":"bg-slate-200 border-slate-300"} label="側院" value={`${inputs.sideYardDepth||0}m`} textColor={isDarkMode?"text-slate-200":"text-stone-600"} valueColor={isDarkMode?"text-slate-400":"text-stone-400"} />
                                  <div className={`w-[1px] h-4 flex-shrink-0 ${isDarkMode ? 'bg-slate-700' : 'bg-stone-300'}`}></div>
-                                 <LegendItem type="line" color={isDarkMode?"bg-purple-400":"bg-purple-500"} label="危老檢討線" textColor={isDarkMode?"text-slate-200":"text-stone-600"} />
+                                 {showWeiLao && <LegendItem type="line" color={isDarkMode?"bg-purple-400":"bg-purple-500"} label="危老檢討線" textColor={isDarkMode?"text-slate-200":"text-stone-600"} />}
                                  <LegendItem type="line" color="bg-rose-500" label="高度比檢討線" textColor={isDarkMode?"text-slate-200":"text-stone-600"} />
-                                 <LegendItem type="line" color={isDarkMode?"bg-sky-400":"bg-sky-500"} label="後院檢討線" textColor={isDarkMode?"text-slate-200":"text-stone-600"} />
+                                 {byRatio > 0 && <LegendItem type="line" color={isDarkMode?"bg-sky-400":"bg-sky-500"} label="後院檢討線" textColor={isDarkMode?"text-slate-200":"text-stone-600"} />}
                               </>
                             ) : (
                               <>
@@ -554,7 +602,7 @@
                                 <div className={`w-[1px] h-4 flex-shrink-0 ${isDarkMode ? 'bg-slate-700' : 'bg-stone-300'}`}></div>
                                 <InfoItem label="容積率" value={formatNum(inputs.floorRatio)} unit="%" isDarkMode={isDarkMode} />
                                 <div className={`w-[1px] h-4 flex-shrink-0 ${isDarkMode ? 'bg-slate-700' : 'bg-stone-300'}`}></div>
-                                <InfoItem label="樓層數" value={`${res.floorsAbove}F / B${inputs.floorsBelow}`} isDarkMode={isDarkMode} />
+                                <InfoItem label="樓層數" value={`${visualFloorsAbove}F / B${inputs.floorsBelow}`} isDarkMode={isDarkMode} />
                               </>
                             )}
                         </div>
@@ -576,18 +624,31 @@
                          <div className="space-y-3 mt-4">
                             <SummaryRow label="專案名稱" value={inputs.projectName} />
                             <SummaryRow label="工程預算" value={`${formatNum(res.estimatedBudget)} 萬`} highlight />
-                            <SummaryRow label="建築物高度" value={`${formatNum(res.buildingHeight)} m`} />
+                            <SummaryRow label="建築物高度" value={`${formatNum(massingLayers.totalHeight)} m`} />
+                            {/* Updated Summary Row to show simulated floors */}
+                            <SummaryRow label="模擬樓層" value={`${visualFloorsAbove} 層`} subtext="(含退縮)" />
                             
                             {showCheckLines && (
                               <SummaryRow label="高度比" value={res.heightRatio} isAlert={res.isHighRise} alertText={res.isSuperHighRise ? "超高" : "高層"} />
                             )}
                             
-                            <div className="flex justify-between items-center pt-2 border-t border-stone-200 mt-2">
-                               <span className="text-stone-500 text-sm font-medium">檢討線顯示</span>
-                               <button onClick={() => setShowCheckLines(!showCheckLines)} className={`px-3 py-1 rounded-full border shadow-sm flex items-center gap-2 text-xs font-bold transition-colors ${showCheckLines ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-stone-200 text-stone-500'}`}>
-                                  {showCheckLines ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                                  {showCheckLines ? "開啟" : "關閉"}
-                               </button>
+                            <div className="pt-2 border-t border-stone-200 mt-2">
+                               <div className="flex justify-between items-center mb-2">
+                                   <span className="text-stone-500 text-sm font-medium">檢討線顯示</span>
+                                   <button onClick={() => setShowCheckLines(!showCheckLines)} className={`px-3 py-1 rounded-full border shadow-sm flex items-center gap-2 text-xs font-bold transition-colors ${showCheckLines ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-stone-200 text-stone-500'}`}>
+                                      {showCheckLines ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                      {showCheckLines ? "開啟" : "關閉"}
+                                   </button>
+                               </div>
+                               
+                               {showCheckLines && (
+                                   <div className="flex justify-between items-center pl-2 border-l-2 border-indigo-100 ml-1">
+                                       <span className="text-stone-400 text-xs font-medium">↳ 危老檢討線</span>
+                                       <button onClick={() => setShowWeiLao(!showWeiLao)} className={`px-2 py-0.5 rounded border shadow-sm flex items-center gap-1 text-[10px] font-bold transition-colors ${showWeiLao ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-white border-stone-200 text-stone-400'}`}>
+                                          {showWeiLao ? "顯示" : "隱藏"}
+                                       </button>
+                                   </div>
+                               )}
                             </div>
                          </div>
                       </div>
@@ -603,7 +664,8 @@
                          </div>
                          <div className="bg-white p-3 rounded-lg border border-stone-200">
                             <div className="text-stone-400 text-[10px] uppercase mb-1">樓層</div>
-                            <div className="font-bold text-lg num-font text-indigo-600">{res.floorsAbove}F <span className="text-xs font-sans font-normal text-stone-400">/ B{inputs.floorsBelow}</span></div>
+                            {/* Updated to show visual floors */}
+                            <div className="font-bold text-lg num-font text-indigo-600">{visualFloorsAbove}F <span className="text-xs font-sans font-normal text-stone-400">/ B{inputs.floorsBelow}</span></div>
                          </div>
                          <div className="bg-white p-3 rounded-lg border border-stone-200">
                             <div className="text-stone-400 text-[10px] uppercase mb-1">停車</div>

@@ -174,7 +174,10 @@
         const [viewAngleX, setViewAngleX] = useState(58);
         const [zoom, setZoom] = useState(1);
         const [isDragging, setIsDragging] = useState(false);
+        
+        // Touch State
         const lastMousePos = useRef({ x: 0, y: 0 });
+        const lastPinchDist = useRef(null); // Track pinch distance
         
         const viewportRef = useRef(null);
 
@@ -214,6 +217,7 @@
             setZoom(prev => Math.min(3, Math.max(0.2, prev + delta)));
           };
 
+          // Native wheel listener for smooth desktop zoom without page scroll
           element.addEventListener('wheel', handleNativeWheel, { passive: false });
 
           return () => {
@@ -221,13 +225,26 @@
           };
         }, []); 
 
+        // Helper: Calculate distance between two touch points
+        const getTouchDistance = (touches) => {
+            return Math.hypot(
+                touches[0].pageX - touches[1].pageX,
+                touches[0].pageY - touches[1].pageY
+            );
+        };
+
         const handleMouseDown = (e) => {
           setIsDragging(true);
           lastMousePos.current = { x: e.clientX, y: e.clientY };
         };
 
         const handleTouchStart = (e) => {
-          if(e.touches.length === 1) {
+          if (e.touches.length === 2) {
+             // Pinch Start
+             lastPinchDist.current = getTouchDistance(e.touches);
+             setIsDragging(false); // Stop rotating if pinching
+          } else if(e.touches.length === 1) {
+             // Drag Start
              setIsDragging(true);
              lastMousePos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
           }
@@ -238,16 +255,10 @@
           const deltaX = e.clientX - lastMousePos.current.x;
           const deltaY = e.clientY - lastMousePos.current.y;
           
-          // 修正：如果處於橫向模式，滑鼠/觸控的座標對應需要旋轉 90 度修正
           let effectiveDeltaX = deltaX;
           let effectiveDeltaY = deltaY;
 
           if (isLandscapeMode) {
-             // 在旋轉 90 度的座標系下：
-             // 實體手指往右 (Physical X+) -> 視覺上是往上 (Visual Y-) -> 這裡要小心旋轉方向
-             // 假設 container rotate(90deg)
-             // Physical X+ matches Visual Y+ (Down)? No.
-             // 簡單映射：
              effectiveDeltaX = deltaY; 
              effectiveDeltaY = -deltaX;
           }
@@ -259,12 +270,23 @@
         };
 
         const handleTouchMove = (e) => {
+          if (e.touches.length === 2 && lastPinchDist.current !== null) {
+             // Pinch Zoom Logic
+             const currentDist = getTouchDistance(e.touches);
+             const delta = currentDist - lastPinchDist.current;
+             const zoomSpeed = 0.005; // Sensitivity
+             
+             setZoom(prev => Math.min(3, Math.max(0.2, prev + delta * zoomSpeed)));
+             lastPinchDist.current = currentDist;
+             
+             return; // Skip rotation logic
+          }
+
           if (!isDragging || e.touches.length !== 1) return;
           
           const deltaX = e.touches[0].clientX - lastMousePos.current.x;
           const deltaY = e.touches[0].clientY - lastMousePos.current.y;
           
-          // 同樣應用橫向模式的座標修正
           let effectiveDeltaX = deltaX;
           let effectiveDeltaY = deltaY;
 
@@ -279,15 +301,18 @@
           lastMousePos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         };
 
-        const handleMouseUp = () => setIsDragging(false);
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            lastPinchDist.current = null;
+        };
+        
         const handleZoomIn = () => setZoom(prev => Math.min(3, prev + 0.2));
         const handleZoomOut = () => setZoom(prev => Math.max(0.2, prev - 0.2));
 
         // --- 3D Calculations ---
-        // 修正：在橫向模式下，canvas 尺寸應該要變大 (全螢幕)
-        // 正常手機: 200, 橫向全螢幕: 更大 (例如 400 或動態計算)
-        // 這裡維持 scale 邏輯不變，因為 CSS zoom/transform 會處理視覺大小
-        const canvasSize = isMobile ? (isLandscapeMode ? 350 : 200) : 280; 
+        // Use 100dvh for landscape mode to ensure full coverage (address bar fix)
+        // Adjust standard scale logic slightly for landscape to fill height
+        const canvasSize = isMobile ? (isLandscapeMode ? 320 : 200) : 280; 
         
         const baseWidthM = parseFloat(inputs.baseWidth) > 0 ? parseFloat(inputs.baseWidth) : Math.sqrt(inputs.baseArea || 100);
         const baseDepthM = (inputs.baseArea || 100) / baseWidthM;
@@ -422,36 +447,38 @@
           return roadEls;
         };
 
-        // 定義橫向全螢幕的樣式
+        // 定義橫向全螢幕的樣式 - 修正為 100dvh 以確保滿版，且調整控制列位置
         const landscapeStyle = isLandscapeMode ? {
             position: 'fixed',
             top: 0,
-            left: '100vw', // 移到最右邊 (因為旋轉基準點是 top left)
-            width: '100vh', // 寬度變成高度
-            height: '100vw', // 高度變成寬度
+            left: '100vw', 
+            width: '100dvh', // Use dvh for mobile browsers to handle URL bar
+            height: '100vw', 
             transform: 'rotate(90deg)',
             transformOrigin: 'top left',
             zIndex: 9999,
             margin: 0,
             borderRadius: 0,
-            touchAction: 'none'
+            touchAction: 'none',
+            backgroundColor: isDarkMode ? '#0f172a' : '#fafaf9'
         } : { 
             backgroundImage: colors.grid, 
             backgroundSize: '40px 40px', 
-            touchAction: 'none' // 預設防止滾動
+            touchAction: 'none'
         };
 
+        // Landscape mode UI adjustments
+        // Use larger padding in landscape mode to avoid corner clipping
+        const controlBarClass = isLandscapeMode ? "absolute top-6 right-6 z-30 flex gap-2" : "absolute top-4 right-4 z-30 flex gap-2";
+
         return (
-          // 修正：主要容器
           <div className="bg-[#fdfbf7] rounded-xl p-0 mb-6 shadow-md overflow-hidden relative min-h-[350px] md:min-h-[600px] flex flex-col md:flex-row border border-stone-300 font-['GenYoGothic',_sans-serif] md:sticky md:top-0 md:z-40">
              
              <div className="flex flex-col md:flex-row w-full h-full relative">
                 
-                {/* 3D 視窗：應用 landscapeStyle */}
                 <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`}
                      style={{
                         ...landscapeStyle,
-                        // 如果不是橫向模式，背景圖才需要在這裡設定 (雖然上面邏輯已包含)
                         ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' })
                      }}
                      onMouseDown={handleMouseDown}
@@ -463,8 +490,8 @@
                      onTouchEnd={handleMouseUp}
                 >
                   
-                  {/* 控制列 */}
-                  <div className="absolute top-4 right-4 z-30 flex gap-2">
+                  {/* 控制列 - Dynamic Positioning */}
+                  <div className={controlBarClass}>
                      <div className={`${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white/90 border-stone-200'} p-1 rounded-full border shadow-lg flex items-center gap-1 backdrop-blur-md transition-colors duration-300`}>
                         <button onClick={handleZoomOut} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title="縮小">
                           <ZoomOut size={18} />
@@ -607,6 +634,7 @@
                             <SummaryRow label="專案名稱" value={inputs.projectName} />
                             <SummaryRow label="工程預算" value={`${formatNum(res.estimatedBudget)} 萬`} highlight />
                             <SummaryRow label="建築物高度" value={`${formatNum(massingLayers.totalHeight)} m`} />
+                            {/* Updated Summary Row to show simulated floors */}
                             <SummaryRow label="模擬樓層" value={`${visualFloorsAbove} 層`} subtext="(含退縮)" />
                             
                             {showCheckLines && (
@@ -645,6 +673,7 @@
                          </div>
                          <div className="bg-white p-3 rounded-lg border border-stone-200">
                             <div className="text-stone-400 text-[10px] uppercase mb-1">樓層</div>
+                            {/* Updated to show visual floors */}
                             <div className="font-bold text-lg num-font text-indigo-600">{visualFloorsAbove}F <span className="text-xs font-sans font-normal text-stone-400">/ B{inputs.floorsBelow}</span></div>
                          </div>
                          <div className="bg-white p-3 rounded-lg border border-stone-200">

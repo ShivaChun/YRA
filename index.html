@@ -164,8 +164,10 @@
         );
       };
 
+      // Optimized Compass: Uses CSS Variable for rotation
       const ArtisticCompass = ({ className, rotation, isDarkMode }) => (
-        <div className={`${className} relative flex items-center justify-center opacity-80 transition-transform duration-300 ease-out`} style={{ transform: `rotate(${rotation}deg)` }}>
+        <div className={`${className} relative flex items-center justify-center opacity-80 transition-transform duration-300 ease-out`} 
+             style={{ transform: `rotate(calc(-1 * var(--rotZ, ${-rotation}deg)))` }}>
           <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
             <circle cx="50" cy="50" r="46" fill={isDarkMode ? "#1e293b" : "#f8fafc"} stroke={isDarkMode ? "#475569" : "#94a3b8"} strokeWidth="1.5" />
             <circle cx="50" cy="50" r="42" fill="none" stroke={isDarkMode ? "#64748b" : "#cbd5e1"} strokeWidth="0.5" strokeDasharray="3 3" />
@@ -178,7 +180,7 @@
         </div>
       );
 
-      // Floor Info Card (UPDATED: Simplified)
+      // Floor Info Card
       const FloorInfoCard = ({ data, isDarkMode, onReset, isConstraintMode }) => {
         const [position, setPosition] = useState({ x: 0, y: 0 });
         
@@ -436,8 +438,8 @@
         </div>
       );
 
-      // BuildingLayer with Polygon & Curve Support (FIXED: Rendering Issues)
-      const BuildingLayer = ({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
+      // BuildingLayer with Polygon & Curve Support (OPTIMIZED for Mobile)
+      const BuildingLayer = ({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves, isMobile }) => {
         if (!visible) return null;
         const thickness = isSlabMode ? Math.max(1.5, height * 0.08) : height;
         
@@ -480,7 +482,6 @@
             const ptsPx = points.map(p => ({ x: (p.x || 0) * scale, y: (p.y || 0) * scale }));
             if (ptsPx.some(p => isNaN(p.x) || isNaN(p.y))) return null;
 
-            // FIX: Dynamic container size to avoid "Large Error Block" from oversize containers
             const minX = Math.min(...ptsPx.map(p=>p.x));
             const maxX = Math.max(...ptsPx.map(p=>p.x));
             const minY = Math.min(...ptsPx.map(p=>p.y));
@@ -517,7 +518,8 @@
 
             // Generate Walls
             const walls = [];
-            const segmentsForCurve = 8; // Improved smoothness
+            // OPTIMIZATION: Reduce segments on mobile to prevent lag
+            const segmentsForCurve = isMobile ? 3 : 8; 
 
             for (let i = 0; i < ptsPx.length; i++) {
                 const p1 = ptsPx[i];
@@ -536,15 +538,12 @@
                         const dx = currP.x - prevP.x;
                         const dy = currP.y - prevP.y;
                         const dist = Math.sqrt(dx*dx + dy*dy);
-                        // Fix angle: atan2(dy, dx)
                         const angle = Math.atan2(dy, dx) * (180 / Math.PI);
                         const midX = (prevP.x + currP.x) / 2;
                         const midY = (prevP.y + currP.y) / 2;
                         
-                        // Slightly overlap walls to prevent tearing
-                        // FIX: Rotation Order for Walls - Use RY for Plan rotation instead of RZ to ensure walls stand straight on Z but rotated on Plan
                         walls.push(
-                            <div key={`${i}-${k}`} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, angle, 0, highlightBg, finalBorder, finalOpacity)} />
+                            <div key={`${i}-${k}`} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, 0, angle, highlightBg, finalBorder, finalOpacity)} />
                         );
                         prevP = currP;
                     }
@@ -555,16 +554,12 @@
                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
                     const midX = (p1.x + p2.x) / 2;
                     const midY = (p1.y + p2.y) / 2;
-                    // FIX: Rotation Order for Walls - Use RY for Plan rotation instead of RZ
                     walls.push(
-                        <div key={i} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, angle, 0, highlightBg, finalBorder, finalOpacity)} />
+                        <div key={i} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, 0, angle, highlightBg, finalBorder, finalOpacity)} />
                     );
                 }
             }
 
-            // Top/Bottom Faces - transform needs to account for the container center vs 0,0
-            // The container center is (minX + contW/2, minY + contH/2) which is bCx
-            // Actually simpler: position at bCx, bCy
             const topFaceStyle = {
                  ...face(contW, contH, bCx, bCy, thickness, 0, 0, 0, highlightBg, 'none', finalOpacity + 0.1),
                  clipPath: clipPath,
@@ -576,39 +571,22 @@
             };
 
             // FIX: 3D Wireframe Bounding Box for Review Mode
-            // Generating correct normal box faces based on bounding box
             let reviewBox = null;
             if (isViolation || showFrame) {
                  const boxBorder = `2px dashed ${isViolation ? '#ef4444' : '#f43f5e'}`;
-                 // We create 4 pillars and 2 rects to form a 3D prism
-                 // FIX: Expand box slightly to avoid Z-fighting with mesh
-                 const eps = 2; 
-                 const boxW = bW + eps;
-                 const boxD = bD + eps;
-                 const boxH = thickness + eps;
+                 const cornerZ = thickness;
                  
                  reviewBox = (
                      <div className="pointer-events-none" style={{
                          position: 'absolute', top:0, left:0, width:0, height:0,
                          transform: `translate3d(${bCx}px, ${bCy}px, ${thickness/2}px)`
                      }}>
-                         {/* Top Rect */}
-                         <div style={{
-                             position: 'absolute', width: `${boxW}px`, height: `${boxD}px`,
-                             border: boxBorder,
-                             transform: `translate(-50%, -50%) translateZ(${boxH/2}px)`
-                         }}/>
-                         {/* Bottom Rect */}
-                         <div style={{
-                             position: 'absolute', width: `${boxW}px`, height: `${boxD}px`,
-                             border: boxBorder,
-                             transform: `translate(-50%, -50%) translateZ(${-boxH/2}px)`
-                         }}/>
-                         {/* 4 Pillars */}
-                         <div style={{position: 'absolute', width:0, height:`${boxH}px`, borderLeft: boxBorder, transform: `translate3d(-${boxW/2}px, -${boxD/2}px, -${boxH/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${boxH}px`, borderLeft: boxBorder, transform: `translate3d(${boxW/2}px, -${boxD/2}px, -${boxH/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${boxH}px`, borderLeft: boxBorder, transform: `translate3d(${boxW/2}px, ${boxD/2}px, -${boxH/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${boxH}px`, borderLeft: boxBorder, transform: `translate3d(-${boxW/2}px, ${boxD/2}px, -${boxH/2}px) rotateX(0deg)`}}/>
+                         <div style={{ position: 'absolute', width: `${bW}px`, height: `${bD}px`, border: boxBorder, transform: `translate(-50%, -50%) translateZ(${thickness/2}px)` }}/>
+                         <div style={{ position: 'absolute', width: `${bW}px`, height: `${bD}px`, border: boxBorder, transform: `translate(-50%, -50%) translateZ(${-thickness/2}px)` }}/>
+                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(-${bW/2}px, -${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
+                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(${bW/2}px, -${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
+                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(${bW/2}px, ${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
+                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(-${bW/2}px, ${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
                      </div>
                  );
             }
@@ -656,467 +634,6 @@
         );
       };
 
-      // 2D Plan View Component with Shape Editing & CURVE SUPPORT
-      const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation }) => {
-          if (selectedFloorId) {
-              const isBase = selectedFloorId === 'base';
-              const selectedLayer = !isBase ? layers.find(l => l.id === selectedFloorId) : null;
-              
-              if (isBase) {
-                  return (
-                      <div className="w-full h-full flex items-center justify-center relative p-10">
-                          <button onClick={() => onSelectFloor(null)} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50"><X size={20}/></button>
-                          <div className="text-stone-400">基地編輯功能開發中...</div>
-                      </div>
-                  )
-              }
-
-              const maxDim = Math.max(baseWidthM, baseDepthM);
-              const padding = 40; 
-              const containerH = 350; 
-              const scale = (containerH - padding * 2) / maxDim;
-              const baseW = baseWidthM * scale;
-              const baseH = baseDepthM * scale;
-              const frontPx = (inputs.frontYardDepth || 0) * scale;
-              const backPx = (inputs.backYardDepth || 0) * scale;
-              const sidePx = (inputs.sideYardDepth || 0) * scale;
-              
-              let xPos = 0, yPos = 0;
-              if (selectedLayer) {
-                  const shiftX_M = selectedLayer.shiftX / scale3d;
-                  const shiftY_M = selectedLayer.shiftYPx / scale3d;
-                  xPos = shiftX_M * scale;
-                  yPos = shiftY_M * scale;
-              }
-              
-              const isDragging = useRef(false);
-              const lastPos = useRef({ x: 0, y: 0 });
-              // Track start position for orthogonal calculations
-              const dragStartPos = useRef({ x: 0, y: 0 });
-              const dragStartPoint = useRef(null); // Store original meter coordinates
-              
-              const handleDragStart = (e) => {
-                  if (e.button !== 0) return; 
-                  if (e.target.dataset.type === 'control-point' || e.target.dataset.type === 'edge-line' || e.target.dataset.type === 'curve-handle') return; 
-                  e.stopPropagation();
-                  isDragging.current = true;
-                  lastPos.current = { x: e.clientX, y: e.clientY };
-                  e.target.setPointerCapture(e.pointerId);
-              };
-              
-              const handleDragMove = (e) => {
-                  if (!isDragging.current) return;
-                  const dxPx = e.clientX - lastPos.current.x;
-                  const dyPx = e.clientY - lastPos.current.y;
-                  const dxM = dxPx / scale;
-                  const dyM = dyPx / scale;
-                  onUpdateSetting(selectedLayer.id, 'offset_delta', { x: dxM, y: dyM });
-                  lastPos.current = { x: e.clientX, y: e.clientY };
-              };
-              
-              const handleDragEnd = (e) => {
-                  isDragging.current = false;
-                  e.target.releasePointerCapture(e.pointerId);
-              };
-
-              // --- POLYGON & CURVE EDIT HANDLERS ---
-              const draggingPointIdx = useRef(null);
-              const draggingCurveIdx = useRef(null);
-              const [selectedIndices, setSelectedIndices] = useState(new Set());
-              const [lockedEdgeIndices, setLockedEdgeIndices] = useState(new Set());
-              const draggingEdgeIdx = useRef(null);
-
-              const handlePointPointerDown = (e, idx) => {
-                  e.stopPropagation();
-                  e.target.setPointerCapture(e.pointerId);
-                  const newSelected = new Set(e.shiftKey ? selectedIndices : []);
-                  newSelected.add(idx);
-                  setSelectedIndices(newSelected);
-                  draggingPointIdx.current = idx;
-                  lastPos.current = { x: e.clientX, y: e.clientY };
-                  dragStartPos.current = { x: e.clientX, y: e.clientY };
-                  // Store initial state for ortho calc
-                  dragStartPoint.current = selectedLayer.points[idx]; 
-              };
-
-              // Curve Handle Drag
-              const handleCurvePointerDown = (e, idx) => {
-                  e.stopPropagation();
-                  e.target.setPointerCapture(e.pointerId);
-                  draggingCurveIdx.current = idx;
-                  lastPos.current = { x: e.clientX, y: e.clientY };
-                  dragStartPos.current = { x: e.clientX, y: e.clientY };
-                  dragStartPoint.current = selectedLayer.curves?.[idx] || {x:0, y:0};
-              };
-
-              // FIX: Correct Orthogonal Movement Logic
-              const handlePointPointerMove = (e) => {
-                 if (draggingPointIdx.current === null && draggingEdgeIdx.current === null && draggingCurveIdx.current === null) return;
-                 e.stopPropagation();
-                 
-                 // Default delta from last frame
-                 let dxPx = e.clientX - lastPos.current.x;
-                 let dyPx = e.clientY - lastPos.current.y;
-                 
-                 // If Shift is held, we need to calculate total displacement from start to decide axis
-                 // BUT we need to apply delta incrementally to React state which is tricky.
-                 // Better: Use the stored dragStartPoint to calculate absolute position, then diff.
-                 
-                 if (e.shiftKey && (draggingPointIdx.current !== null || draggingCurveIdx.current !== null)) {
-                     const totalDx = e.clientX - dragStartPos.current.x;
-                     const totalDy = e.clientY - dragStartPos.current.y;
-                     
-                     // Constrain delta for this frame
-                     if (Math.abs(totalDx) > Math.abs(totalDy)) {
-                         // X-Axis Move: dy should be 0.
-                         // But since we are accumulating, we just ignore dyPx this frame
-                         dyPx = 0;
-                     } else {
-                         // Y-Axis Move
-                         dxPx = 0;
-                     }
-                 }
-
-                 const dxM = dxPx / scale;
-                 const dyM = dyPx / scale; 
-                 
-                 const rotRad = -(selectedLayer.rotation || 0) * (Math.PI / 180); 
-                 const cos = Math.cos(rotRad);
-                 const sin = Math.sin(rotRad);
-                 const localDx = dxM * cos - dyM * sin;
-                 const localDy = dxM * sin + dyM * cos;
-
-                 // Handling Curve Drag
-                 if (draggingCurveIdx.current !== null) {
-                     const currentCurves = { ...(selectedLayer.curves || {}) };
-                     const idx = draggingCurveIdx.current;
-                     const oldC = currentCurves[idx] || { x:0, y:0 };
-                     currentCurves[idx] = { x: oldC.x + localDx, y: oldC.y + localDy };
-                     onUpdateSetting(selectedLayer.id, 'curves', currentCurves);
-                 } 
-                 // Handling Point/Edge Drag
-                 else {
-                     const currentPoints = [...selectedLayer.points];
-                     const indicesToMove = new Set();
-                     if (draggingEdgeIdx.current !== null) {
-                         indicesToMove.add(draggingEdgeIdx.current);
-                         indicesToMove.add((draggingEdgeIdx.current + 1) % currentPoints.length);
-                     } else {
-                         indicesToMove.add(draggingPointIdx.current);
-                         selectedIndices.forEach(idx => indicesToMove.add(idx));
-                     }
-
-                     indicesToMove.forEach(idx => {
-                         const p = currentPoints[idx];
-                         // Safety check for NaN
-                         const newX = (p.x || 0) + localDx;
-                         const newY = (p.y || 0) + localDy;
-                         if (!isNaN(newX) && !isNaN(newY)) {
-                            currentPoints[idx] = { x: newX, y: newY };
-                         }
-                     });
-                     
-                     onUpdateSetting(selectedLayer.id, 'points', currentPoints);
-                 }
-                 lastPos.current = { x: e.clientX, y: e.clientY };
-              };
-
-              const handlePointPointerUp = (e) => {
-                  draggingPointIdx.current = null;
-                  draggingEdgeIdx.current = null;
-                  draggingCurveIdx.current = null;
-                  e.target.releasePointerCapture(e.pointerId);
-              };
-
-              const handleEdgeContextMenu = (e, idx) => {
-                  e.preventDefault(); e.stopPropagation();
-                  const newLocked = new Set(lockedEdgeIndices);
-                  if (newLocked.has(idx)) newLocked.delete(idx); else newLocked.add(idx);
-                  setLockedEdgeIndices(newLocked);
-              };
-
-              const handleEdgePointerDown = (e, idx) => {
-                  if (!lockedEdgeIndices.has(idx)) return;
-                  e.stopPropagation(); e.target.setPointerCapture(e.pointerId);
-                  draggingEdgeIdx.current = idx;
-                  lastPos.current = { x: e.clientX, y: e.clientY };
-                  dragStartPos.current = { x: e.clientX, y: e.clientY };
-              };
-
-              const handleLineClick = (e, idx1, idx2) => {
-                 e.stopPropagation();
-                 if (!e.shiftKey) { 
-                     const pts = [...selectedLayer.points];
-                     const p1 = pts[idx1];
-                     const p2 = pts[idx2];
-                     const newP = { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 };
-                     if (idx2 === 0 && idx1 === pts.length - 1) pts.push(newP);
-                     else pts.splice(idx2, 0, newP);
-                     onUpdateSetting(selectedLayer.id, 'points', pts);
-                 }
-              };
-
-              const handleDeletePoint = (e, idx) => {
-                 e.preventDefault(); e.stopPropagation();
-                 const pts = [...selectedLayer.points];
-                 if (pts.length <= 3) return;
-                 pts.splice(idx, 1);
-                 onUpdateSetting(selectedLayer.id, 'points', pts);
-              };
-              
-              const generatePath = () => {
-                  if (!selectedLayer.points) return "";
-                  const pts = selectedLayer.points;
-                  const curves = selectedLayer.curves || {};
-                  
-                  let d = `M ${(pts[0].x * scale)} ${(pts[0].y * scale)}`;
-                  for (let i = 0; i < pts.length; i++) {
-                      const nextP = pts[(i + 1) % pts.length];
-                      const curve = curves[i];
-                      if (curve) {
-                          d += ` Q ${(curve.x * scale)} ${(curve.y * scale)}, ${(nextP.x * scale)} ${(nextP.y * scale)}`;
-                      } else {
-                          d += ` L ${(nextP.x * scale)} ${(nextP.y * scale)}`;
-                      }
-                  }
-                  d += " Z";
-                  return d;
-              };
-
-              const renderCurveHandles = () => {
-                  if (!selectedLayer.points) return null;
-                  return selectedLayer.points.map((p, i) => {
-                      const nextI = (i + 1) % selectedLayer.points.length;
-                      const nextP = selectedLayer.points[nextI];
-                      const curve = selectedLayer.curves?.[i];
-                      
-                      const isEdgeSelected = selectedIndices.has(i) && selectedIndices.has(nextI);
-                      
-                      if (isEdgeSelected || curve) {
-                           const cpX = curve ? curve.x : (p.x + nextP.x)/2;
-                           const cpY = curve ? curve.y : (p.y + nextP.y)/2;
-                           
-                           return (
-                               <g key={`curve-${i}`} transform={`translate(${cpX * scale}, ${cpY * scale})`}>
-                                   <line x1={(p.x - cpX)*scale} y1={(p.y - cpY)*scale} x2={0} y2={0} stroke="#93c5fd" strokeDasharray="3" strokeWidth="1" />
-                                   <line x1={(nextP.x - cpX)*scale} y1={(nextP.y - cpY)*scale} x2={0} y2={0} stroke="#93c5fd" strokeDasharray="3" strokeWidth="1" />
-                                   
-                                   <circle 
-                                       data-type="curve-handle"
-                                       r="5" 
-                                       fill="#f59e0b" stroke="white" strokeWidth="2"
-                                       className="cursor-crosshair hover:scale-125 transition-transform"
-                                       onPointerDown={(e) => {
-                                            if (!curve) {
-                                                const newCurves = { ...(selectedLayer.curves || {}), [i]: {x: cpX, y: cpY} };
-                                                onUpdateSetting(selectedLayer.id, 'curves', newCurves);
-                                            }
-                                            handleCurvePointerDown(e, i);
-                                       }}
-                                       onPointerMove={handlePointPointerMove}
-                                       onPointerUp={handlePointPointerUp}
-                                   />
-                               </g>
-                           )
-                      }
-                      return null;
-                  });
-              };
-
-              return (
-                  <div className="w-full h-full flex flex-col relative overflow-hidden">
-                      <button onClick={() => onSelectFloor(null)} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50 shadow-md"><X size={20}/></button>
-                      
-                      <div className="flex-1 flex items-center justify-center p-4 pb-32 transition-all duration-300" onClick={() => onSelectFloor(null)}>
-                          <div className="relative" onClick={(e) => e.stopPropagation()}>
-                              <svg width={baseW + 100} height={baseH + 100} viewBox={`-${baseW/2 + 50} -${baseH/2 + 50} ${baseW + 100} ${baseH + 100}`} className="overflow-visible shadow-xl bg-white rounded-lg">
-                                  <rect x={-baseW/2} y={-baseH/2} width={baseW} height={baseH} fill={isDarkMode ? "#1e293b" : "#f5f5f4"} stroke={isDarkMode ? "#475569" : "#d6d3d1"} strokeWidth="1" />
-                                  {showCheckLines && (
-                                      <>
-                                          <line x1={-baseW/2} y1={baseH/2 - frontPx} x2={baseW/2} y2={baseH/2 - frontPx} stroke="#ef4444" strokeWidth="1" strokeDasharray="4" />
-                                          <line x1={-baseW/2} y1={-baseH/2 + backPx} x2={baseW/2} y2={-baseH/2 + backPx} stroke="#10b981" strokeWidth="1" strokeDasharray="4" />
-                                          {inputs.sideYardDirection === 'right' ? <line x1={baseW/2 - sidePx} y1={-baseH/2} x2={baseW/2 - sidePx} y2={baseH/2} stroke="#3b82f6" strokeWidth="1" strokeDasharray="4" /> : <line x1={-baseW/2 + sidePx} y1={-baseH/2} x2={-baseW/2 + sidePx} y2={baseH/2} stroke="#3b82f6" strokeWidth="1" strokeDasharray="4" />}
-                                      </>
-                                  )}
-                                  {inputs.roads.map((r, i) => r.type === 'primary' && <text key={i} x={0} y={baseH/2 + 15} textAnchor="middle" fontSize="10" fill="#94a3b8" fontWeight="bold">臨路 ({r.name})</text>)}
-
-                                  {selectedLayer && (
-                                      <g transform={`translate(${xPos}, ${yPos}) rotate(${selectedLayer.rotation || 0})`} className="cursor-move" onPointerDown={handleDragStart} onPointerMove={handleDragMove} onPointerUp={handleDragEnd}>
-                                          {selectedLayer.points ? (
-                                              <>
-                                                  <path 
-                                                      d={generatePath()}
-                                                      fill={selectedLayer.isViolation ? "rgba(239, 68, 68, 0.5)" : (isDarkMode ? "#38bdf8" : "#0ea5e9")} 
-                                                      stroke={selectedLayer.isViolation ? "#ef4444" : "#0284c7"}
-                                                      strokeWidth="2"
-                                                      opacity="0.9"
-                                                  />
-                                                  {selectedLayer.points.map((p, i) => {
-                                                      const nextI = (i + 1) % selectedLayer.points.length;
-                                                      const nextP = selectedLayer.points[nextI];
-                                                      const isLocked = lockedEdgeIndices.has(i);
-                                                      return (
-                                                          <line 
-                                                              key={`line-${i}`}
-                                                              data-type="edge-line"
-                                                              x1={p.x * scale} y1={p.y * scale} 
-                                                              x2={nextP.x * scale} y2={nextP.y * scale} 
-                                                              stroke={isLocked ? "#ef4444" : "transparent"} 
-                                                              strokeWidth={isLocked ? "3" : "15"} 
-                                                              strokeLinecap="round"
-                                                              className={`${isLocked ? 'cursor-grab' : 'cursor-crosshair hover:stroke-black/10'}`}
-                                                              onContextMenu={(e) => handleEdgeContextMenu(e, i)}
-                                                              onPointerDown={(e) => isLocked ? handleEdgePointerDown(e, i) : null}
-                                                              onPointerMove={handlePointPointerMove}
-                                                              onPointerUp={handlePointPointerUp}
-                                                              onClick={(e) => !isLocked && handleLineClick(e, i, nextI)}
-                                                          />
-                                                      );
-                                                  })}
-                                                  {renderCurveHandles()}
-                                                  {selectedLayer.points.map((p, i) => (
-                                                      <g key={`pt-${i}`} transform={`translate(${p.x * scale}, ${p.y * scale})`}>
-                                                          <circle 
-                                                              data-type="control-point"
-                                                              r="6" 
-                                                              fill="white" stroke={selectedIndices.has(i) ? "#6366f1" : "#0284c7"} strokeWidth={selectedIndices.has(i) ? "3" : "2"}
-                                                              className={`cursor-grab relative ${selectedIndices.has(i) ? 'animate-pulse-ring' : ''}`}
-                                                              onPointerDown={(e) => handlePointPointerDown(e, i)}
-                                                              onPointerMove={handlePointPointerMove}
-                                                              onPointerUp={handlePointPointerUp}
-                                                              onContextMenu={(e) => handleDeletePoint(e, i)}
-                                                          />
-                                                          {selectedIndices.has(i) && <circle r="12" fill="none" stroke="#6366f1" strokeWidth="1" opacity="0.5" className="animate-ping pointer-events-none"/>}
-                                                      </g>
-                                                  ))}
-                                              </>
-                                          ) : (
-                                              <rect 
-                                                  x={-(selectedLayer.realWidth * scale)/2} 
-                                                  y={-(selectedLayer.realDepth * scale)/2} 
-                                                  width={selectedLayer.realWidth * scale} 
-                                                  height={selectedLayer.realDepth * scale} 
-                                                  fill={selectedLayer.isViolation ? "rgba(239, 68, 68, 0.5)" : (isDarkMode ? "#38bdf8" : "#0ea5e9")} 
-                                                  stroke={selectedLayer.isViolation ? "#ef4444" : "#0284c7"}
-                                                  strokeWidth="2"
-                                                  opacity="0.9"
-                                              />
-                                          )}
-                                          <circle cx={(selectedLayer.pivot?.x || 0) * scale} cy={(selectedLayer.pivot?.y || 0) * scale} r="4" fill="#ef4444" stroke="white" strokeWidth="1" />
-                                      </g>
-                                  )}
-                              </svg>
-                          </div>
-                          
-                          {selectedLayer && selectedLayer.points && (
-                             <div className="absolute bottom-32 left-1/2 -translate-x-1/2 bg-stone-800/80 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none backdrop-blur shadow-lg text-center w-max space-y-1">
-                                 <div>拖曳圓點調整 • Shift正交移動 • 右鍵邊線鎖定</div>
-                                 <div className="text-[10px] text-amber-300">★ 選取相連兩點可調整曲線</div>
-                             </div>
-                          )}
-                      </div>
-                      
-                      {selectedLayer && (
-                          <EditMenu2D 
-                              data={selectedLayer} 
-                              isDarkMode={isDarkMode} 
-                              onUpdateSetting={onUpdateSetting}
-                              onReset={(id) => onUpdateSetting(id, 'reset')} 
-                              isOpen={true}
-                              onClose={() => onSelectFloor(null)}
-                              scale3d={scale3d}
-                          />
-                      )}
-                  </div>
-              );
-          }
-
-          const baseItemScale = 100 / Math.max(baseWidthM, baseDepthM);
-          const hasActiveBasement = basements.some(b => b.active);
-          
-          return (
-              <div className="w-full h-full overflow-y-auto p-4 pt-16">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
-                      <div onClick={() => onSelectFloor('base')} className={`aspect-square rounded-xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center relative bg-stone-50 hover:bg-white hover:shadow hover:border-indigo-400 ${isDarkMode ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700' : 'border-stone-200'}`}>
-                          <span className="absolute top-2 left-2 text-xs font-bold text-stone-500 bg-stone-100 px-1.5 rounded">基地</span>
-                          <svg width={100} height={100} viewBox={`-${baseWidthM*baseItemScale/2+10} -${baseDepthM*baseItemScale/2+10} ${baseWidthM*baseItemScale+20} ${baseDepthM*baseItemScale+20}`} className="overflow-visible">
-                              {inputs.roads.map((r, i) => r.type === 'primary' && <line key={i} x1={-30} y1={baseDepthM*baseItemScale/2 + 5} x2={30} y2={baseDepthM*baseItemScale/2 + 5} stroke="#94a3b8" strokeWidth="2" strokeDasharray="4"/>)}
-                              <rect x={-baseWidthM*baseItemScale/2} y={-baseDepthM*baseItemScale/2} width={baseWidthM*baseItemScale} height={baseDepthM*baseItemScale} fill="none" stroke={isDarkMode ? "#cbd5e1" : "#475569"} strokeWidth="2" />
-                              {!hasActiveBasement && !parkingOn1F && <g transform={`translate(${baseWidthM*baseItemScale/2 - 12}, ${baseDepthM*baseItemScale/2 - (inputs.frontYardDepth||0)*baseItemScale/2})`}><rect x="-4" y="-7" width="8" height="14" fill="none" stroke="#f59e0b" strokeWidth="1" /><text x="0" y="2" textAnchor="middle" fontSize="5" fill="#f59e0b">P</text></g>}
-                              {showCheckLines && <><line x1={-baseWidthM*baseItemScale/2} y1={baseDepthM*baseItemScale/2 - (inputs.frontYardDepth||0)*baseItemScale} x2={baseWidthM*baseItemScale/2} y2={baseDepthM*baseItemScale/2 - (inputs.frontYardDepth||0)*baseItemScale} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="2" /><line x1={-baseWidthM*baseItemScale/2} y1={-baseDepthM*baseItemScale/2 + (inputs.backYardDepth||0)*baseItemScale} x2={baseWidthM*baseItemScale/2} y2={-baseDepthM*baseItemScale/2 + (inputs.backYardDepth||0)*baseItemScale} stroke="#10b981" strokeWidth="0.5" strokeDasharray="2" /></>}
-                          </svg>
-                          <div className="absolute bottom-2 text-[10px] text-stone-400 font-mono">{formatNum(baseWidthM*baseDepthM)}m²</div>
-                      </div>
-
-                      {layers.map((layer, idx) => {
-                          const baseDim = 100; 
-                          const scale = baseDim / Math.max(baseWidthM, baseDepthM);
-                          const baseW = baseWidthM * scale;
-                          const baseH = baseDepthM * scale;
-                          const shiftX_M = layer.shiftX / scale3d;
-                          const shiftY_M = layer.shiftYPx / scale3d;
-                          const xPos = shiftX_M * scale;
-                          const yPos = shiftY_M * scale;
-                          const frontPx = (inputs.frontYardDepth || 0) * scale;
-                          const backPx = (inputs.backYardDepth || 0) * scale;
-
-                          return (
-                              <div key={layer.id} onClick={() => onSelectFloor(layer.id)} className={`aspect-square rounded-xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center relative bg-white/50 hover:bg-white hover:shadow-lg hover:border-indigo-400 ${isDarkMode ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700' : 'border-stone-200'}`}>
-                                  <span className="absolute top-2 left-2 text-xs font-bold text-stone-500 bg-stone-100 px-1.5 rounded">{layer.id}</span>
-                                  {layer.isViolation && <AlertTriangle size={14} className="absolute top-2 right-2 text-red-500" />}
-                                  <svg width={baseDim} height={baseDim} viewBox={`-${baseW/2+10} -${baseH/2+10} ${baseW+20} ${baseH+20}`} className="overflow-visible">
-                                      {inputs.roads.map((r, i) => r.type === 'primary' && <line key={i} x1={-baseW/2} y1={baseH/2 + 5} x2={baseW/2} y2={baseH/2 + 5} stroke="#94a3b8" strokeWidth="2" strokeDasharray="4" />)}
-                                      <rect x={-baseW/2} y={-baseH/2} width={baseW} height={baseH} fill="none" stroke={isDarkMode ? "#475569" : "#cbd5e1"} strokeWidth="1" />
-                                      {showCheckLines && <><line x1={-baseW/2} y1={baseH/2 - frontPx} x2={baseW/2} y2={baseH/2 - frontPx} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="2" /><line x1={-baseW/2} y1={-baseH/2 + backPx} x2={baseW/2} y2={-baseH/2 + backPx} stroke="#10b981" strokeWidth="0.5" strokeDasharray="2" /></>}
-                                      <g transform={`translate(${xPos}, ${yPos}) rotate(${layer.rotation || 0})`}> 
-                                          {layer.points ? (
-                                              <path 
-                                                  d={generateSvgPath(layer.points, layer.curves, scale)} 
-                                                  fill={layer.isViolation ? "#fca5a5" : "#bae6fd"} 
-                                                  opacity="0.8"
-                                              />
-                                          ) : (
-                                              <rect x={-(layer.realWidth * scale)/2} y={-(layer.realDepth * scale)/2} width={layer.realWidth * scale} height={layer.realDepth * scale} fill={layer.isViolation ? "#fca5a5" : "#bae6fd"} opacity="0.8"/>
-                                          )}
-                                      </g>
-                                  </svg>
-                                  <div className="absolute bottom-2 text-[10px] text-stone-400 font-mono">{formatNum(toPing(layer.realArea))}坪</div>
-                              </div>
-                          );
-                      })}
-                      {basements.map((b) => {
-                          const baseDim = 100;
-                          const scale = baseDim / Math.max(baseWidthM, baseDepthM);
-                          const baseW = baseWidthM * scale;
-                          const baseH = baseDepthM * scale;
-                          const bW = baseW * 0.8;
-                          const bH = baseH * 0.8;
-                          return (
-                              <div key={b.id} className={`aspect-square rounded-xl border-2 transition-all flex flex-col items-center justify-center relative ${b.active ? (isDarkMode ? 'bg-slate-700 border-indigo-500' : 'bg-white border-indigo-400') : (isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-stone-50 border-stone-200 opacity-60')}`}>
-                                  <div className="absolute top-2 left-2 flex items-center gap-2 z-10">
-                                      <input type="checkbox" checked={b.active} onChange={() => onToggleBasement(b.id)} className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"/>
-                                      <span className={`text-xs font-bold ${b.active ? 'text-indigo-600' : 'text-stone-400'}`}>{b.id}</span>
-                                  </div>
-                                  <svg width={baseDim} height={baseDim} viewBox={`-${baseW/2+10} -${baseH/2+10} ${baseW+20} ${baseH+20}`} className="overflow-visible opacity-50">
-                                      <rect x={-baseW/2} y={-baseH/2} width={baseW} height={baseH} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="2" />
-                                      <rect x={-bW/2} y={-bH/2} width={bW} height={bH} fill={b.active ? "#818cf8" : "none"} stroke="#6366f1" strokeWidth="1" opacity={b.active ? 0.3 : 0.1} />
-                                  </svg>
-                                  <div className="absolute bottom-2 text-center w-full"><div className="text-[10px] text-stone-400">{formatNum(toPing(b.area))}坪</div>{b.recommended && <div className="text-[9px] text-emerald-500 font-bold">建議興建</div>}</div>
-                              </div>
-                          );
-                      })}
-                      {!hasActiveBasement && (
-                          <div onClick={onToggleParkingLocation} className={`aspect-square rounded-xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center relative bg-stone-50 hover:bg-white hover:border-amber-400 border-stone-300`}>
-                              <span className="absolute top-2 left-2 text-xs font-bold text-stone-500 bg-stone-100 px-1.5 rounded">停車配置</span>
-                              {parkingOn1F ? <div className="flex flex-col items-center text-indigo-500"><Warehouse size={32} /><span className="text-xs font-bold mt-1">1F 室內停車</span></div> : <div className="flex flex-col items-center text-amber-500"><ParkingCircle size={32} /><span className="text-xs font-bold mt-1">法定空地停車</span></div>}
-                              <div className="absolute bottom-2 text-[9px] text-stone-400 text-center px-2">{parkingOn1F ? "計入容積/免計" : "不計入容積"}</div>
-                          </div>
-                      )}
-                  </div>
-              </div>
-          );
-      };
-
       const Visualizer3D = ({ inputs, res, onUpdateBaseDim, onResetAll }) => {
         const [animate, setAnimate] = useState(false);
         const [showCheckLines, setShowCheckLines] = useState(false);
@@ -1157,9 +674,16 @@
             }
         };
         const toggleConstraints = () => { setIsConstraintMode(!isConstraintMode); if (!isConstraintMode) setShowCheckLines(true); };
+        
+        // --- OPTIMIZATION: USE REFS FOR VISUAL STATE ---
         const [rotationZ, setRotationZ] = useState(-45);
         const [viewAngleX, setViewAngleX] = useState(58);
         const [zoom, setZoom] = useState(1);
+        
+        // Mutable refs for immediate updates during drag (bypass React render)
+        const visualState = useRef({ rotZ: -45, rotX: 58, zoom: 1 });
+        const sceneRef = useRef(null);
+
         const [isDragging, setIsDragging] = useState(false);
         const lastMousePos = useRef({ x: 0, y: 0 });
         const lastPinchDist = useRef(null); 
@@ -1173,10 +697,19 @@
         useEffect(() => {
           const element = viewportRef.current;
           if (!element) return;
-          const handleNativeWheel = (e) => { if(e.cancelable) e.preventDefault(); e.stopPropagation(); const sensitivity = 0.002; const delta = -e.deltaY * sensitivity; setZoom(prev => Math.min(3, Math.max(0.2, prev + delta))); };
+          const handleNativeWheel = (e) => { 
+              if(e.cancelable) e.preventDefault(); 
+              e.stopPropagation(); 
+              const sensitivity = 0.002; 
+              const delta = -e.deltaY * sensitivity; 
+              const newZoom = Math.min(3, Math.max(0.2, zoom + delta));
+              setZoom(newZoom);
+              visualState.current.zoom = newZoom;
+              // Sync for wheel is fine since it's discrete
+          };
           element.addEventListener('wheel', handleNativeWheel, { passive: false });
           return () => element.removeEventListener('wheel', handleNativeWheel);
-        }, []); 
+        }, [zoom]); 
 
         const getTouchDistance = (touches) => Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
         const handleMouseDown = (e) => { if (viewMode === '2d') return; setIsDragging(true); lastMousePos.current = { x: e.clientX, y: e.clientY }; };
@@ -1185,30 +718,57 @@
           if (e.touches.length === 2) { lastPinchDist.current = getTouchDistance(e.touches); setIsDragging(false); } 
           else if(e.touches.length === 1) { setIsDragging(true); lastMousePos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
         };
-        const handleMouseMove = (e) => {
-          if (!isDragging) return;
-          const deltaX = e.clientX - lastMousePos.current.x;
-          const deltaY = e.clientY - lastMousePos.current.y;
-          let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
-          let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
-          setRotationZ(prev => prev + effectiveDeltaX * 0.5);
-          setViewAngleX(prev => Math.min(85, Math.max(10, prev - effectiveDeltaY * 0.5)));
-          lastMousePos.current = { x: e.clientX, y: e.clientY };
+        
+        // OPTIMIZED MOVE HANDLER: Direct DOM Manipulation via CSS Variables
+        const handleMove = (clientX, clientY, isTouch = false) => {
+            if (!isDragging) return;
+            const deltaX = clientX - lastMousePos.current.x;
+            const deltaY = clientY - lastMousePos.current.y;
+            let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
+            let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
+            
+            // Update refs
+            visualState.current.rotZ += effectiveDeltaX * 0.5;
+            visualState.current.rotX = Math.min(85, Math.max(10, visualState.current.rotX - effectiveDeltaY * 0.5));
+            
+            // Apply to DOM directly (bypass React Render)
+            if (sceneRef.current) {
+                sceneRef.current.style.setProperty('--rotZ', `${visualState.current.rotZ}deg`);
+                sceneRef.current.style.setProperty('--rotX', `${visualState.current.rotX}deg`);
+            }
+            
+            lastMousePos.current = { x: clientX, y: clientY };
         };
+
+        const handleMouseMove = (e) => handleMove(e.clientX, e.clientY);
+        
         const handleTouchMove = (e) => {
-          if (e.touches.length === 2 && lastPinchDist.current !== null) { const currentDist = getTouchDistance(e.touches); const delta = currentDist - lastPinchDist.current; setZoom(prev => Math.min(3, Math.max(0.2, prev + delta * 0.005))); lastPinchDist.current = currentDist; return; }
-          if (!isDragging || e.touches.length !== 1) return;
-          const deltaX = e.touches[0].clientX - lastMousePos.current.x;
-          const deltaY = e.touches[0].clientY - lastMousePos.current.y;
-          let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
-          let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
-          setRotationZ(prev => prev + effectiveDeltaX * 0.5);
-          setViewAngleX(prev => Math.min(85, Math.max(10, prev - effectiveDeltaY * 0.5)));
-          lastMousePos.current = { x: e.clientX, y: e.touches[0].clientX, y: e.touches[0].clientY };
+          // Pinch Zoom
+          if (e.touches.length === 2 && lastPinchDist.current !== null) { 
+              const currentDist = getTouchDistance(e.touches); 
+              const delta = currentDist - lastPinchDist.current; 
+              const newZoom = Math.min(3, Math.max(0.2, visualState.current.zoom + delta * 0.005));
+              visualState.current.zoom = newZoom;
+              if (sceneRef.current) sceneRef.current.style.setProperty('--zoom', newZoom);
+              lastPinchDist.current = currentDist; 
+              return; 
+          }
+          if (e.touches.length !== 1) return;
+          handleMove(e.touches[0].clientX, e.touches[0].clientY, true);
         };
-        const handleMouseUp = () => { setIsDragging(false); lastPinchDist.current = null; };
-        const handleZoomIn = () => setZoom(prev => Math.min(3, prev + 0.2));
-        const handleZoomOut = () => setZoom(prev => Math.max(0.2, prev - 0.2));
+        
+        // Sync back to React state on end
+        const handleEnd = () => { 
+            setIsDragging(false); 
+            lastPinchDist.current = null;
+            // Commit values to state
+            setRotationZ(visualState.current.rotZ);
+            setViewAngleX(visualState.current.rotX);
+            setZoom(visualState.current.zoom);
+        };
+
+        const handleZoomIn = () => { const nz = Math.min(3, zoom + 0.2); setZoom(nz); visualState.current.zoom = nz; };
+        const handleZoomOut = () => { const nz = Math.max(0.2, zoom - 0.2); setZoom(nz); visualState.current.zoom = nz; };
 
         const handleLayerClick = (e, layer) => {
             e.stopPropagation(); 
@@ -1218,9 +778,23 @@
             setSelectedFloor({ ...layer, rotation: layer.rotation || 0, pivot: settings.pivot || { x: 0, y: 0 }, alignment: settings.alignment || { x: 'left', y: 'back' }, violations: layer.violations || [], points: settings.points || null, curves: settings.curves || null });
             const targetZ = layer.z + layer.height * 0.5;
             setFocusOffset({ x: -layer.shiftX, y: -layer.shiftYPx, z: -targetZ });
-            setZoom(2.5);
+            
+            // Zoom in logic
+            const newZoom = 2.5;
+            setZoom(newZoom);
+            visualState.current.zoom = newZoom;
         };
-        const handleBgClick = () => { if (selectedFloor) { setSelectedFloor(null); setFocusOffset({ x: 0, y: 0, z: 0 }); setZoom(Math.max(0.5, preSelectZoom)); } };
+        
+        const handleBgClick = () => { 
+            if (selectedFloor) { 
+                setSelectedFloor(null); 
+                setFocusOffset({ x: 0, y: 0, z: 0 }); 
+                const oldZoom = Math.max(0.5, preSelectZoom);
+                setZoom(oldZoom);
+                visualState.current.zoom = oldZoom;
+            } 
+        };
+
         const updateFloorSetting = (floorId, field, value) => {
            if (isConstraintMode) return; 
            if (field === 'reset') { setFloorSettings(prev => { const copy = {...prev}; delete copy[floorId]; return copy; }); return; }
@@ -1344,7 +918,7 @@
         return (
           <div className="bg-[#fdfbf7] rounded-xl p-0 mb-6 shadow-md overflow-hidden relative min-h-[350px] md:min-h-[600px] flex flex-col md:flex-row border border-stone-300 font-['GenYoGothic',_sans-serif] md:sticky md:top-0 md:z-40">
              <div className="flex flex-col md:flex-row w-full h-full relative">
-                <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp} onClick={handleBgClick}>
+                <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleEnd} onMouseLeave={handleEnd} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleEnd} onClick={handleBgClick}>
                   <div className="absolute top-4 left-4 z-40 flex bg-white/90 backdrop-blur rounded-lg border border-stone-200 shadow-sm p-1 gap-1">
                       <button onClick={() => { setViewMode('3d'); setSelectedFloor(null); }} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
                       <button onClick={() => setViewMode('2d')} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '2d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><LayoutTemplate size={14} /> 平面分析</button>
@@ -1363,7 +937,18 @@
                           <div className="absolute top-16 left-6 z-20 pointer-events-none"><ArtisticCompass className="w-16 h-16" rotation={-rotationZ} isDarkMode={isDarkMode} /></div>
                           {totalAreaViolation && <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none animate-pulse"><div className="bg-red-500/90 text-white px-3 py-1.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 backdrop-blur"><AlertTriangle size={16} fill="white" className="text-red-500" />總容積超限! ({formatNum(toPing(massingLayers.currentTotalUsed))} > {formatNum(toPing(volumeLimit))}坪)</div></div>}
                           <div className="relative w-full h-full flex items-center justify-center pointer-events-none" style={{ perspective: '2500px', transformStyle: 'preserve-3d' }}>
-                            <div style={{ transform: `rotateX(${viewAngleX}deg) rotateZ(${rotationZ}deg) scale3d(${zoom}, ${zoom}, ${zoom}) translate3d(${focusOffset.x}px, ${focusOffset.y}px, ${focusOffset.z}px)`, transformStyle: 'preserve-3d', transition: viewTransition }}>
+                            <div 
+                                ref={sceneRef}
+                                style={{ 
+                                    // Use CSS Variables controlled by JS during drag for performance
+                                    '--rotX': `${viewAngleX}deg`,
+                                    '--rotZ': `${rotationZ}deg`,
+                                    '--zoom': zoom,
+                                    transform: `rotateX(var(--rotX)) rotateZ(var(--rotZ)) scale3d(var(--zoom), var(--zoom), var(--zoom)) translate3d(${focusOffset.x}px, ${focusOffset.y}px, ${focusOffset.z}px)`, 
+                                    transformStyle: 'preserve-3d', 
+                                    transition: isDragging ? 'none' : 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' 
+                                }}
+                            >
                                <div style={{ position: 'relative', width: `${w}px`, height: `${d}px`, backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(168, 162, 158, 0.4)', transformStyle: 'preserve-3d', transition: 'background-color 0.5s'}}>
                                   <div className={`absolute border shadow-2xl transition-colors duration-500 ${isDarkMode ? 'bg-slate-800/80 border-slate-600' : 'bg-transparent border-stone-300'}`} style={{ width: '100%', height: '100%', boxShadow: isDarkMode ? '0 0 20px rgba(0,0,0,0.5)' : 'none' }}>
                                      {renderRoads()}
@@ -1377,7 +962,7 @@
                                      )}
                                   </div>
                                   {Array.from({length: floorsBelow}).map((_, i) => (<div key={`bm-${i}`} className={`absolute border border-dashed ${isDarkMode ? 'border-slate-600 bg-slate-800/50' : 'border-stone-400 bg-stone-200/50'}`} style={{ width: `${w*0.8}px`, height: `${d*0.8}px`, left: '50%', top: '50%', transform: `translate(-50%, -50%) translateZ(${-(i+1)*Math.max(20, 3.6*scale*0.8)}px)` }}></div>))}
-                                  {floorLayers.map((layer, i) => (<BuildingLayer key={`fl-${i}`} width={layer.widthPx} depth={layer.depthPx} height={layer.height} x={layer.shiftX} y={layer.shiftYPx} z={layer.z} rotation={layer.rotation} pivot={selectedFloor?.id === layer.id ? selectedFloor.pivot : floorSettings[layer.id]?.pivot} scale={scale} points={layer.points} curves={layer.curves} color={colors.floor} strokeColor={colors.stroke} showFrame={true} opacity={1} visible={true} isSlabMode={!showCheckLines} animate={animate} delay={i * 50} isDarkMode={isDarkMode} isSelected={selectedFloor && selectedFloor.id === layer.id} isViolation={layer.isViolation} onClick={(e) => handleLayerClick(e, layer)} />))}
+                                  {floorLayers.map((layer, i) => (<BuildingLayer key={`fl-${i}`} width={layer.widthPx} depth={layer.depthPx} height={layer.height} x={layer.shiftX} y={layer.shiftYPx} z={layer.z} rotation={layer.rotation} pivot={selectedFloor?.id === layer.id ? selectedFloor.pivot : floorSettings[layer.id]?.pivot} scale={scale} points={layer.points} curves={layer.curves} color={colors.floor} strokeColor={colors.stroke} showFrame={true} opacity={1} visible={true} isSlabMode={!showCheckLines} animate={animate} delay={i * 50} isDarkMode={isDarkMode} isSelected={selectedFloor && selectedFloor.id === layer.id} isViolation={layer.isViolation} onClick={(e) => handleLayerClick(e, layer)} isMobile={isMobile}/>))}
                                   {(showCheckLines || Object.keys(floorSettings).length > 0 || isConstraintMode) && (
                                      <>
                                         <CheckLine start={{ x: w/2, y: d + roadW_Px, z: 0 }} end={{ x: w/2, y: d - frontPx, z: limitH_HeightRatio_Px }} color="#f43f5e" label="高度比" baseRotation={0} viewAngleX={viewAngleX} rotationZ={rotationZ} visible={true} dashed={true} thick={true} isDarkMode={isDarkMode} labelPosRatio={0.2} />
@@ -1476,7 +1061,14 @@
       };
 
       const Si = ({ text, x, y, z, rotationZ, baseRotation, viewAngleX, visible, className, lineConnector }) => (
-        visible ? (<div className="absolute pointer-events-none" style={{ left: 0, top: 0, transform: `translate3d(${x}px, ${y}px, ${z}px) rotateZ(${-(rotationZ + baseRotation)}deg) rotateX(${-viewAngleX}deg)`, zIndex: 5000 }}><div className="flex items-center" style={{ transform: 'translate(-50%, -50%)' }}>{lineConnector && <div className="w-4 h-[1px] bg-stone-400"></div>}<div className={`whitespace-nowrap px-2 py-0.5 rounded shadow-sm text-sm backdrop-blur-sm num-font ${className}`}>{text}</div></div></div>) : null
+        visible ? (
+            <div className="absolute pointer-events-none" style={{ left: 0, top: 0, transform: `translate3d(${x}px, ${y}px, ${z}px) rotateZ(calc(-1 * (var(--rotZ, ${rotationZ}deg) + ${baseRotation}deg))) rotateX(calc(-1 * var(--rotX, ${viewAngleX}deg)))`, zIndex: 5000 }}>
+                <div className="flex items-center" style={{ transform: 'translate(-50%, -50%)' }}>
+                    {lineConnector && <div className="w-4 h-[1px] bg-stone-400"></div>}
+                    <div className={`whitespace-nowrap px-2 py-0.5 rounded shadow-sm text-sm backdrop-blur-sm num-font ${className}`}>{text}</div>
+                </div>
+            </div>
+        ) : null
       );
 
       const CollapsibleSection = ({ title, icon, children, defaultOpen = true, className = "" }) => {

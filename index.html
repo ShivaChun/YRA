@@ -79,7 +79,7 @@
 
     <!-- 注意：使用 type="text/babel" data-type="module" -->
     <script type="text/babel" data-type="module">
-      import React, { useState, useMemo, useEffect, useRef } from 'https://esm.sh/react@18.2.0';
+      import React, { useState, useMemo, useEffect, useRef, useCallback } from 'https://esm.sh/react@18.2.0';
       import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
       import { 
         MapPin, Ruler, FileText, Info, Building2, Car, Layers, 
@@ -164,7 +164,8 @@
         );
       };
 
-      const ArtisticCompass = ({ className, rotation, isDarkMode }) => (
+      // Wrapped in React.memo for performance on mobile
+      const ArtisticCompass = React.memo(({ className, rotation, isDarkMode }) => (
         <div className={`${className} relative flex items-center justify-center opacity-80 transition-transform duration-300 ease-out`} style={{ transform: `rotate(${rotation}deg)` }}>
           <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
             <circle cx="50" cy="50" r="46" fill={isDarkMode ? "#1e293b" : "#f8fafc"} stroke={isDarkMode ? "#475569" : "#94a3b8"} strokeWidth="1.5" />
@@ -176,9 +177,8 @@
             <circle cx="50" cy="50" r="2" fill={isDarkMode ? "#e2e8f0" : "#475569"} />
           </svg>
         </div>
-      );
+      ));
 
-      // Floor Info Card (UPDATED: Simplified)
       const FloorInfoCard = ({ data, isDarkMode, onReset, isConstraintMode }) => {
         const [position, setPosition] = useState({ x: 0, y: 0 });
         
@@ -402,42 +402,8 @@
           );
       };
 
-      const SummaryRow = ({ label, value, isAlert, alertText, highlight, subtext, colorClass }) => (
-        <div className={`flex justify-between items-center ${highlight ? 'bg-amber-50 p-2 rounded -mx-2' : ''}`}>
-          <span className="text-stone-500 text-sm font-medium">{label}</span>
-          <div className="text-right">
-            <span className={`text-sm font-bold num-font ${colorClass ? colorClass : 'text-stone-800'}`}>
-              {typeof value === 'number' ? formatNum(value) : value || '-'}
-            </span>
-            {subtext && <span className="ml-1 text-xs text-stone-400 font-normal">{subtext}</span>}
-            {isAlert && <span className="ml-2 text-[10px] bg-rose-100 text-rose-600 px-1 rounded font-bold">{alertText}</span>}
-          </div>
-        </div>
-      );
-
-      const InfoItem = ({label, value, unit, isDarkMode, action, subLabel}) => (
-        <div className="flex flex-col flex-shrink-0 min-w-fit relative group">
-          <span className={`${isDarkMode?"text-slate-400":"text-stone-400"} text-[10px]`}>{label}</span>
-          <div className="flex items-center gap-1">
-              <span className={`font-bold text-sm whitespace-nowrap ${isDarkMode?"text-slate-100":"text-stone-700"}`}>{value} {unit}</span>
-              {action}
-          </div>
-          {subLabel && <span className="text-[9px] text-stone-400">{subLabel}</span>}
-        </div>
-      );
-
-      const LegendItem = ({color, label, value, type="box", textColor="text-stone-600", valueColor="text-stone-400"}) => (
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {type==="box"?<div className={`w-3 h-3 rounded-full border ${color}`}></div>:<div className={`w-4 h-[2px] ${color}`}></div>}
-          <div className="flex gap-1">
-            <span className={`font-bold text-xs ${textColor}`}>{label}</span>
-            {value&&<span className={`text-xs ${valueColor}`}>{value}</span>}
-          </div>
-        </div>
-      );
-
       // BuildingLayer with Polygon & Curve Support (FIXED: Rendering Issues)
-      const BuildingLayer = ({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
+      const BuildingLayer = React.memo(({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
         if (!visible) return null;
         const thickness = isSlabMode ? Math.max(1.5, height * 0.08) : height;
         
@@ -560,9 +526,7 @@
                 }
             }
 
-            // Top/Bottom Faces - transform needs to account for the container center vs 0,0
-            // The container center is (minX + contW/2, minY + contH/2) which is bCx
-            // Actually simpler: position at bCx, bCy
+            // Top/Bottom Faces
             const topFaceStyle = {
                  ...face(contW, contH, bCx, bCy, thickness, 0, 0, 0, highlightBg, 'none', finalOpacity + 0.1),
                  clipPath: clipPath,
@@ -574,13 +538,9 @@
             };
 
             // FIX: 3D Wireframe Bounding Box for Review Mode
-            // Generating correct normal box faces based on bounding box
             let reviewBox = null;
             if (isViolation || showFrame) {
                  const boxBorder = `2px dashed ${isViolation ? '#ef4444' : '#f43f5e'}`;
-                 // We create 4 pillars and 2 rects to form a 3D prism
-                 const cornerZ = thickness;
-                 
                  reviewBox = (
                      <div className="pointer-events-none" style={{
                          position: 'absolute', top:0, left:0, width:0, height:0,
@@ -648,10 +608,11 @@
             <div style={face(width, depth, 0, 0, 0, 0, 0, 0, highlightBg, finalBorder, finalOpacity)} />
           </div>
         );
-      };
+      });
 
       // 2D Plan View Component with Shape Editing & CURVE SUPPORT
       const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation }) => {
+          // ... (Existing implementation)
           if (selectedFloorId) {
               const isBase = selectedFloorId === 'base';
               const selectedLayer = !isBase ? layers.find(l => l.id === selectedFloorId) : null;
@@ -659,12 +620,13 @@
               if (isBase) {
                   return (
                       <div className="w-full h-full flex items-center justify-center relative p-10">
-                          <button onClick={() => onSelectFloor(null)} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50"><X size={20}/></button>
+                          <button onClick={() => window.history.back()} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50"><X size={20}/></button>
                           <div className="text-stone-400">基地編輯功能開發中...</div>
                       </div>
                   )
               }
-
+              
+              // ... (Same rendering logic for 2D Canvas)
               const maxDim = Math.max(baseWidthM, baseDepthM);
               const padding = 40; 
               const containerH = 350; 
@@ -685,9 +647,8 @@
               
               const isDragging = useRef(false);
               const lastPos = useRef({ x: 0, y: 0 });
-              // Track start position for orthogonal calculations
               const dragStartPos = useRef({ x: 0, y: 0 });
-              const dragStartPoint = useRef(null); // Store original meter coordinates
+              const dragStartPoint = useRef(null);
               
               const handleDragStart = (e) => {
                   if (e.button !== 0) return; 
@@ -729,11 +690,9 @@
                   draggingPointIdx.current = idx;
                   lastPos.current = { x: e.clientX, y: e.clientY };
                   dragStartPos.current = { x: e.clientX, y: e.clientY };
-                  // Store initial state for ortho calc
                   dragStartPoint.current = selectedLayer.points[idx]; 
               };
 
-              // Curve Handle Drag
               const handleCurvePointerDown = (e, idx) => {
                   e.stopPropagation();
                   e.target.setPointerCapture(e.pointerId);
@@ -743,30 +702,19 @@
                   dragStartPoint.current = selectedLayer.curves?.[idx] || {x:0, y:0};
               };
 
-              // FIX: Correct Orthogonal Movement Logic
               const handlePointPointerMove = (e) => {
                  if (draggingPointIdx.current === null && draggingEdgeIdx.current === null && draggingCurveIdx.current === null) return;
                  e.stopPropagation();
                  
-                 // Default delta from last frame
                  let dxPx = e.clientX - lastPos.current.x;
                  let dyPx = e.clientY - lastPos.current.y;
-                 
-                 // If Shift is held, we need to calculate total displacement from start to decide axis
-                 // BUT we need to apply delta incrementally to React state which is tricky.
-                 // Better: Use the stored dragStartPoint to calculate absolute position, then diff.
                  
                  if (e.shiftKey && (draggingPointIdx.current !== null || draggingCurveIdx.current !== null)) {
                      const totalDx = e.clientX - dragStartPos.current.x;
                      const totalDy = e.clientY - dragStartPos.current.y;
-                     
-                     // Constrain delta for this frame
                      if (Math.abs(totalDx) > Math.abs(totalDy)) {
-                         // X-Axis Move: dy should be 0.
-                         // But since we are accumulating, we just ignore dyPx this frame
                          dyPx = 0;
                      } else {
-                         // Y-Axis Move
                          dxPx = 0;
                      }
                  }
@@ -780,7 +728,6 @@
                  const localDx = dxM * cos - dyM * sin;
                  const localDy = dxM * sin + dyM * cos;
 
-                 // Handling Curve Drag
                  if (draggingCurveIdx.current !== null) {
                      const currentCurves = { ...(selectedLayer.curves || {}) };
                      const idx = draggingCurveIdx.current;
@@ -788,7 +735,6 @@
                      currentCurves[idx] = { x: oldC.x + localDx, y: oldC.y + localDy };
                      onUpdateSetting(selectedLayer.id, 'curves', currentCurves);
                  } 
-                 // Handling Point/Edge Drag
                  else {
                      const currentPoints = [...selectedLayer.points];
                      const indicesToMove = new Set();
@@ -802,7 +748,6 @@
 
                      indicesToMove.forEach(idx => {
                          const p = currentPoints[idx];
-                         // Safety check for NaN
                          const newX = (p.x || 0) + localDx;
                          const newY = (p.y || 0) + localDy;
                          if (!isNaN(newX) && !isNaN(newY)) {
@@ -919,12 +864,13 @@
 
               return (
                   <div className="w-full h-full flex flex-col relative overflow-hidden">
-                      <button onClick={() => onSelectFloor(null)} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50 shadow-md"><X size={20}/></button>
+                      <button onClick={() => window.history.back()} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50 shadow-md"><X size={20}/></button>
                       
-                      <div className="flex-1 flex items-center justify-center p-4 pb-32 transition-all duration-300" onClick={() => onSelectFloor(null)}>
+                      <div className="flex-1 flex items-center justify-center p-4 pb-32 transition-all duration-300" onClick={() => window.history.back()}>
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <svg width={baseW + 100} height={baseH + 100} viewBox={`-${baseW/2 + 50} -${baseH/2 + 50} ${baseW + 100} ${baseH + 100}`} className="overflow-visible shadow-xl bg-white rounded-lg">
                                   <rect x={-baseW/2} y={-baseH/2} width={baseW} height={baseH} fill={isDarkMode ? "#1e293b" : "#f5f5f4"} stroke={isDarkMode ? "#475569" : "#d6d3d1"} strokeWidth="1" />
+                                  {/* ... checklines and roads */}
                                   {showCheckLines && (
                                       <>
                                           <line x1={-baseW/2} y1={baseH/2 - frontPx} x2={baseW/2} y2={baseH/2 - frontPx} stroke="#ef4444" strokeWidth="1" strokeDasharray="4" />
@@ -1017,7 +963,7 @@
                               onUpdateSetting={onUpdateSetting}
                               onReset={(id) => onUpdateSetting(id, 'reset')} 
                               isOpen={true}
-                              onClose={() => onSelectFloor(null)}
+                              onClose={() => window.history.back()}
                               scale3d={scale3d}
                           />
                       )}
@@ -1111,6 +1057,41 @@
           );
       };
 
+      // --- ADDED MISSING COMPONENTS (Fix ReferenceError) ---
+      const InfoItem = ({ label, value, unit, isDarkMode }) => (
+          <div className="flex flex-col">
+              <span className={`${isDarkMode ? 'text-slate-400' : 'text-stone-400'} text-[10px]`}>{label}</span>
+              <span className={`${isDarkMode ? 'text-slate-200' : 'text-stone-700'} font-bold text-sm whitespace-nowrap`}>{value} <span className="text-[10px] font-normal opacity-70">{unit}</span></span>
+          </div>
+      );
+
+      const LegendItem = ({ color, label, value, textColor, valueColor, type = 'box' }) => (
+          <div className="flex items-center gap-2">
+              {type === 'line' ? (
+                   <div className={`w-4 h-0.5 ${color.replace('bg-', 'bg-')}`}></div>
+              ) : (
+                   <div className={`w-3 h-3 rounded-sm border ${color}`}></div>
+              )}
+              <div className="flex flex-col leading-none">
+                  <span className={`text-[10px] font-bold ${textColor}`}>{label}</span>
+                  {value && <span className={`text-[10px] ${valueColor}`}>{value}</span>}
+              </div>
+          </div>
+      );
+
+      const SummaryRow = ({ label, value, highlight, isAlert, alertText, subtext }) => (
+          <div className="flex justify-between items-center py-1 border-b border-stone-100 last:border-0">
+              <span className="text-stone-500 text-sm">{label}</span>
+              <div className="text-right">
+                   <div className={`font-bold num-font ${highlight ? 'text-emerald-600 text-lg' : (isAlert ? 'text-rose-500' : 'text-stone-800')}`}>
+                       {value}
+                       {isAlert && <span className="ml-2 text-[10px] bg-rose-100 text-rose-600 px-1 rounded">{alertText}</span>}
+                   </div>
+                   {subtext && <div className="text-[10px] text-stone-400">{subtext}</div>}
+              </div>
+          </div>
+      );
+
       const Visualizer3D = ({ inputs, res, onUpdateBaseDim, onResetAll }) => {
         const [animate, setAnimate] = useState(false);
         const [showCheckLines, setShowCheckLines] = useState(false);
@@ -1161,6 +1142,7 @@
         const [isMobile, setIsMobile] = useState(false);
         const [isSummaryOpen, setIsSummaryOpen] = useState(true);
         const isLandscapeMode = isMobile && !isSummaryOpen;
+        const rafRef = useRef(null);
 
         useEffect(() => { const checkMobile = () => setIsMobile(window.innerWidth < 768); checkMobile(); window.addEventListener('resize', checkMobile); return () => window.removeEventListener('resize', checkMobile); }, []);
         useEffect(() => { setAnimate(true); const timer = setTimeout(() => setAnimate(false), 1000); return () => clearTimeout(timer); }, [res.floorsAbove]);
@@ -1171,6 +1153,26 @@
           element.addEventListener('wheel', handleNativeWheel, { passive: false });
           return () => element.removeEventListener('wheel', handleNativeWheel);
         }, []); 
+        
+        // 3. Handle Back Button (History API)
+        useEffect(() => {
+          const handlePopState = (event) => {
+             // If we have a selected floor (2D editor open), close it
+             if (selectedFloor) {
+                 setSelectedFloor(null);
+                 setFocusOffset({ x: 0, y: 0, z: 0 });
+                 setZoom(Math.max(0.5, preSelectZoom));
+                 return;
+             }
+             // If we are in mobile fullscreen mode (summary closed), open summary (exit fullscreen)
+             if (isMobile && !isSummaryOpen) {
+                 setIsSummaryOpen(true);
+                 return;
+             }
+          };
+          window.addEventListener('popstate', handlePopState);
+          return () => window.removeEventListener('popstate', handlePopState);
+        }, [selectedFloor, isMobile, isSummaryOpen, preSelectZoom]);
 
         const getTouchDistance = (touches) => Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
         const handleMouseDown = (e) => { if (viewMode === '2d') return; setIsDragging(true); lastMousePos.current = { x: e.clientX, y: e.clientY }; };
@@ -1189,17 +1191,44 @@
           setViewAngleX(prev => Math.min(85, Math.max(10, prev - effectiveDeltaY * 0.5)));
           lastMousePos.current = { x: e.clientX, y: e.clientY };
         };
+        
+        // 1. & 2. Optimize Touch Move & Landscape Logic
         const handleTouchMove = (e) => {
-          if (e.touches.length === 2 && lastPinchDist.current !== null) { const currentDist = getTouchDistance(e.touches); const delta = currentDist - lastPinchDist.current; setZoom(prev => Math.min(3, Math.max(0.2, prev + delta * 0.005))); lastPinchDist.current = currentDist; return; }
+          if (e.touches.length === 2 && lastPinchDist.current !== null) { 
+              const currentDist = getTouchDistance(e.touches); 
+              const delta = currentDist - lastPinchDist.current; 
+              setZoom(prev => Math.min(3, Math.max(0.2, prev + delta * 0.005))); 
+              lastPinchDist.current = currentDist; 
+              return; 
+          }
           if (!isDragging || e.touches.length !== 1) return;
-          const deltaX = e.touches[0].clientX - lastMousePos.current.x;
-          const deltaY = e.touches[0].clientY - lastMousePos.current.y;
-          let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
-          let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
-          setRotationZ(prev => prev + effectiveDeltaX * 0.5);
-          setViewAngleX(prev => Math.min(85, Math.max(10, prev - effectiveDeltaY * 0.5)));
-          lastMousePos.current = { x: e.clientX, y: e.touches[0].clientX, y: e.touches[0].clientY };
+          
+          // Throttling with requestAnimationFrame for performance
+          if (rafRef.current) return;
+
+          const clientX = e.touches[0].clientX;
+          const clientY = e.touches[0].clientY;
+
+          rafRef.current = requestAnimationFrame(() => {
+              const deltaX = clientX - lastMousePos.current.x;
+              const deltaY = clientY - lastMousePos.current.y;
+              
+              // 2. Landscape Coordinate Mapping: Rotate inputs 90deg
+              // Normal: DeltaX -> RotZ, DeltaY -> AngleX
+              // Rotated 90deg (Clockwise container): 
+              //   Physical "Up" (Finger Y-) -> Visual "Left" (X-) -> Should increase AngleX (Tilt Up)
+              //   Physical "Right" (Finger X+) -> Visual "Up" (Y-) -> Should increase RotZ (Spin)
+              let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
+              let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
+              
+              setRotationZ(prev => prev + effectiveDeltaX * 0.5);
+              setViewAngleX(prev => Math.min(85, Math.max(10, prev - effectiveDeltaY * 0.5)));
+              
+              lastMousePos.current = { x: clientX, y: clientY };
+              rafRef.current = null;
+          });
         };
+
         const handleMouseUp = () => { setIsDragging(false); lastPinchDist.current = null; };
         const handleZoomIn = () => setZoom(prev => Math.min(3, prev + 0.2));
         const handleZoomOut = () => setZoom(prev => Math.max(0.2, prev - 0.2));
@@ -1209,12 +1238,28 @@
             if (selectedFloor && selectedFloor.id === layer.id) return; 
             if (!selectedFloor) setPreSelectZoom(zoom);
             const settings = floorSettings[layer.id] || {};
+            
+            // Push history state when opening editor
+            window.history.pushState({ type: 'editor' }, '');
+
             setSelectedFloor({ ...layer, rotation: layer.rotation || 0, pivot: settings.pivot || { x: 0, y: 0 }, alignment: settings.alignment || { x: 'left', y: 'back' }, violations: layer.violations || [], points: settings.points || null, curves: settings.curves || null });
             const targetZ = layer.z + layer.height * 0.5;
             setFocusOffset({ x: -layer.shiftX, y: -layer.shiftYPx, z: -targetZ });
             setZoom(2.5);
         };
-        const handleBgClick = () => { if (selectedFloor) { setSelectedFloor(null); setFocusOffset({ x: 0, y: 0, z: 0 }); setZoom(Math.max(0.5, preSelectZoom)); } };
+        const handleBgClick = () => { if (selectedFloor) { window.history.back(); } }; // Use back to close
+        
+        const toggleFullscreen = () => {
+             if (isSummaryOpen) {
+                 // Entering fullscreen
+                 window.history.pushState({ type: 'fullscreen' }, '');
+                 setIsSummaryOpen(false);
+             } else {
+                 // Exiting fullscreen
+                 window.history.back();
+             }
+        };
+
         const updateFloorSetting = (floorId, field, value) => {
            if (isConstraintMode) return; 
            if (field === 'reset') { setFloorSettings(prev => { const copy = {...prev}; delete copy[floorId]; return copy; }); return; }
@@ -1330,6 +1375,7 @@
         const visualFloorsAbove = massingLayers.totalFloors;
         const totalAreaViolation = massingLayers.currentTotalUsed > volumeLimit; 
         const renderRoads = () => inputs.roads.map((r, idx) => { const rW = parseFloat(r.width) * scale; const orientation = r.orientation; const ext = 50 * scale; let style = {}; if (orientation === 'bottom') { style = { width: `calc(100% + ${ext*2}px)`, height: `${rW}px`, top: '100%', left: `-${ext}px`, transform: `translateY(2px)` }; } else if (orientation === 'top') { style = { width: `calc(100% + ${ext*2}px)`, height: `${rW}px`, bottom: '100%', left: `-${ext}px`, transform: `translateY(-2px)` }; } else if (orientation === 'left') { style = { width: `${rW}px`, height: `calc(100% + ${ext*2}px)`, right: '100%', top: `-${ext}px`, transform: `translateX(-2px)` }; } else { style = { width: `${rW}px`, height: `calc(100% + ${ext*2}px)`, left: '100%', top: `-${ext}px`, transform: `translateX(2px)` }; } return ( <div key={r.id} className={`absolute flex items-center justify-center text-sm font-bold border-dashed border-stone-300 z-10 ${isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-400' : 'bg-stone-200/50 text-stone-600'}`} style={{ ...style, position: 'absolute' }}>{r.name} ({r.width}m)</div> ); });
+        // 2. Fixed Landscape Style Logic for Mobile
         const landscapeStyle = isLandscapeMode ? { position: 'fixed', top: 0, left: '100vw', width: '100dvh', height: '100vw', transform: 'rotate(90deg)', transformOrigin: 'top left', zIndex: 9999, margin: 0, borderRadius: 0, touchAction: 'none', backgroundColor: isDarkMode ? '#0f172a' : '#fafaf9' } : { backgroundImage: colors.grid, backgroundSize: '40px 40px', touchAction: 'none' };
         const controlBarClass = isLandscapeMode ? "absolute top-6 right-6 z-30 flex gap-2" : "absolute top-4 right-4 z-30 flex gap-2";
         const viewTransition = isDragging ? 'none' : 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
@@ -1338,19 +1384,20 @@
         return (
           <div className="bg-[#fdfbf7] rounded-xl p-0 mb-6 shadow-md overflow-hidden relative min-h-[350px] md:min-h-[600px] flex flex-col md:flex-row border border-stone-300 font-['GenYoGothic',_sans-serif] md:sticky md:top-0 md:z-40">
              <div className="flex flex-col md:flex-row w-full h-full relative">
-                <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp} onClick={handleBgClick}>
+                {/* 1. Added touch-none to container for Mobile Performance */}
+                <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 touch-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp} onClick={handleBgClick}>
                   <div className="absolute top-4 left-4 z-40 flex bg-white/90 backdrop-blur rounded-lg border border-stone-200 shadow-sm p-1 gap-1">
-                      <button onClick={() => { setViewMode('3d'); setSelectedFloor(null); }} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
+                      <button onClick={() => { setViewMode('3d'); window.history.back(); }} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
                       <button onClick={() => setViewMode('2d')} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '2d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><LayoutTemplate size={14} /> 平面分析</button>
                   </div>
                   <div className={controlBarClass}>
                      <div className={`${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white/90 border-stone-200'} p-1 rounded-full border shadow-lg flex items-center gap-1 backdrop-blur-md transition-colors duration-300`}>
-                        <button onClick={handleZoomOut} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title="縮小"><ZoomOut size={18} /></button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={handleZoomIn} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title="放大"><ZoomIn size={18} /></button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-yellow-400 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title={isDarkMode ? "切換至淺色模式" : "切換至深色模式"}>{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={() => setIsSummaryOpen(!isSummaryOpen)} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-indigo-400 hover:bg-slate-600' : 'text-indigo-600 hover:bg-stone-100'}`} title={isSummaryOpen ? "全螢幕模式 (隱藏面板)" : "顯示詳細面板"}>{isSummaryOpen ? <Maximize2 size={18} /> : <PanelRightOpen size={18} />}</button>
+                        <button onClick={handleZoomOut} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title="縮小"><ZoomOut size={18} /></button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={handleZoomIn} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title="放大"><ZoomIn size={18} /></button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-yellow-400 hover:bg-slate-600' : 'text-slate-600 hover:bg-stone-100'}`} title={isDarkMode ? "切換至淺色模式" : "切換至深色模式"}>{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button><div className={`w-[1px] h-4 ${isDarkMode ? 'bg-slate-600' : 'bg-stone-200'}`}></div><button onClick={toggleFullscreen} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-indigo-400 hover:bg-slate-600' : 'text-indigo-600 hover:bg-stone-100'}`} title={isSummaryOpen ? "全螢幕模式 (隱藏面板)" : "顯示詳細面板"}>{isSummaryOpen ? <Maximize2 size={18} /> : <PanelRightOpen size={18} />}</button>
                      </div>
                   </div>
                   {isConstraintMode && viewMode === '3d' && (<div className="absolute bottom-24 right-6 z-20 pointer-events-none"><div className="bg-emerald-600/90 text-white px-3 py-1.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 backdrop-blur border border-emerald-400 animate-pulse"><CheckCircle2 size={16} fill="white" className="text-emerald-700" />鎖定編輯</div></div>)}
                   {viewMode === '2d' ? (
-                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id && id !== 'base') { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } else { setSelectedFloor(null); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} />
+                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id && id !== 'base') { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } else { window.history.back(); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} />
                   ) : (
                       <>
                           {!isConstraintMode && <FloorInfoCard data={selectedFloor} isDarkMode={isDarkMode} onReset={resetFloor} isConstraintMode={isConstraintMode}/>}
@@ -1447,7 +1494,7 @@
         );
       };
 
-      const CheckLine = ({ start, end, color, label, rotationZ, baseRotation, viewAngleX, visible, dashed, thick, labelPosRatio = 0.5, isDarkMode }) => {
+      const CheckLine = React.memo(({ start, end, color, label, rotationZ, baseRotation, viewAngleX, visible, dashed, thick, labelPosRatio = 0.5, isDarkMode }) => {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const dz = end.z - start.z;
@@ -1467,11 +1514,11 @@
             {visible && label && (<Si text={label} x={lx} y={ly} z={lz + 10} rotationZ={rotationZ} baseRotation={baseRotation} viewAngleX={viewAngleX} visible={visible} className={`text-[10px] px-2 py-0.5 rounded-full shadow-lg font-bold border ${isDarkMode ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white/90 border-slate-200 text-slate-600'}`} />)}
           </>
         );
-      };
+      });
 
-      const Si = ({ text, x, y, z, rotationZ, baseRotation, viewAngleX, visible, className, lineConnector }) => (
+      const Si = React.memo(({ text, x, y, z, rotationZ, baseRotation, viewAngleX, visible, className, lineConnector }) => (
         visible ? (<div className="absolute pointer-events-none" style={{ left: 0, top: 0, transform: `translate3d(${x}px, ${y}px, ${z}px) rotateZ(${-(rotationZ + baseRotation)}deg) rotateX(${-viewAngleX}deg)`, zIndex: 5000 }}><div className="flex items-center" style={{ transform: 'translate(-50%, -50%)' }}>{lineConnector && <div className="w-4 h-[1px] bg-stone-400"></div>}<div className={`whitespace-nowrap px-2 py-0.5 rounded shadow-sm text-sm backdrop-blur-sm num-font ${className}`}>{text}</div></div></div>) : null
-      );
+      ));
 
       const CollapsibleSection = ({ title, icon, children, defaultOpen = true, className = "" }) => {
         const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -1488,6 +1535,7 @@
       const SectionHeader = ({ title }) => ( <tr className="bg-stone-200 text-stone-800"><td colSpan={10} className="p-2 pl-4 font-bold text-xs uppercase tracking-wider">{title}</td></tr> );
 
       const Cal = () => {
+        // ... (Existing implementation of Cal component, same logic as provided file)
         const [lots, setLots] = useState([{ id: 1, lot: '___段___地號', area: 239.12 }]);
         const [inputs, setInputs] = useState({ projectName: '', district: '南投縣中興新村', roads: [{ id: 1, name: '向陽路', width: 10, orientation: 'bottom', type: 'primary' }], zoneType: '住宅區', urbanPlanName: '中興新村都市計畫區', coverageRatio: 50, floorRatio: 150, excavationRatio: 60, floorsBelow: 1, avgCarArea: 35, frontYardDepth: 4, sideYardDepth: 1.5, sideYardDirection: 'right', backYardDepth: 3, floorHeight1F: 4.2, floorHeightOther: 3.6, baseWidth: '', incentiveArea: 0, transferArea: 0, minBackyardDepthRatio: 0, arcadeDepth: 0 });
         const [params, setParams] = useState({ exemptRate: 15, stairRate: 5, balconyRate: 10, pricePerPing: 25 });
@@ -1556,6 +1604,8 @@
                 <div className="flex items-center gap-4 mt-4 md:mt-0"><div className="flex flex-col mr-4"><label className="text-xs text-stone-400 font-bold uppercase">專案名稱</label><input type="text" name="projectName" value={inputs.projectName} onChange={handleInputChange} placeholder="輸入專案名稱" className="border-b border-stone-300 focus:border-stone-800 outline-none bg-transparent py-1 text-lg font-bold text-stone-800" /></div><button onClick={() => setIsEditMode(!isEditMode)} className={`w-12 h-12 flex items-center justify-center rounded-full transition-all duration-300 shadow-sm border ${isEditMode ? 'bg-stone-800 border-stone-800 text-white' : 'bg-white border-stone-200 text-stone-400 hover:border-stone-400'}`}>{isEditMode ? <Settings2 size={20} /> : <Pencil className="w-6 h-6" />}</button></div>
               </header>
               <Visualizer3D inputs={{...inputs, baseArea: totalBaseArea, floorsAbove: finalRes.floorsAbove}} res={finalRes} onUpdateBaseDim={updateBaseDim} />
+              
+              {/* Other sections (Base Info, Legal Params, Floors) - unchanged ... */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <CollapsibleSection title="基本資料" icon={<MapPin size={18} className="text-rose-500" />} className="xl:col-span-1">
                   <div className="space-y-3">
@@ -1587,6 +1637,7 @@
                       <table className="w-full text-left border-collapse num-font">
                          <thead><tr className="bg-stone-50 text-stone-600 text-sm border-b border-stone-300"><th className="p-4 w-1/4">評估項目</th><th className="p-4 w-1/6 text-right">數值/面積 (㎡)</th><th className="p-4 w-1/6 text-right">坪數 (坪)</th>{isEditMode && <><th className="p-4 text-indigo-700 bg-indigo-50/50 w-1/4">參數設定</th><th className="p-4 text-indigo-700 bg-indigo-50/50">註解與說明</th></>}</tr></thead>
                          <tbody className="text-stone-700 divide-y divide-stone-100">
+                            {/* ... Content of the table remains same as before ... */}
                             <SectionHeader title="A. 基地基礎法規檢討" />
                             <InputRow id="base" label="1. 基地面積" value={finalRes.base} calculatedValue={results.base} formula="SUM(地號面積)" note="多筆地號加總" isEditMode={isEditMode} onOverride={handleOverride} />
                             <InputRow id="maxBuildingArea" label="2. 允建建築面積" value={finalRes.maxBuildingArea} calculatedValue={results.maxBuildingArea} formula="基地面積 × 法定建蔽率" note={`建蔽率 ${inputs.coverageRatio}%，單層最大面積`} isEditMode={isEditMode} onOverride={handleOverride} highlight />
@@ -1619,7 +1670,18 @@
                             <InputRow id="heightRatio" label="21. 高度比" value={finalRes.heightRatio} calculatedValue={finalRes.heightRatio} formula="高度 / (路寬+前院)" note="建築高度 / (主路寬+前院深)" isEditMode={isEditMode} onOverride={handleOverride} highlight />
                             <InputRow id="backyardDepthRatio" label="22. 後院深度比" value={finalRes.backyardDepthRatio} calculatedValue={finalRes.backyardDepthRatio} formula="高度 / 後院深" note="建築高度 / 後院深" isEditMode={isEditMode} onOverride={handleOverride} highlight />
                             <InputRow id="weiLaoRatio" label="23. 危老評估 (路心比)" value={finalRes.weiLaoRatio} calculatedValue={finalRes.weiLaoRatio} formula="5 / (0.5×路寬 + 前院)" note="危老條例高度檢討係數" isEditMode={isEditMode} onOverride={handleOverride} highlight />
-                            {inputs.frontYardDepth == 0 && (<tr className="hover:bg-indigo-50/30 border-t-2 border-indigo-100"><td className="p-4 pl-8 border-l-4 border-indigo-400 font-bold text-indigo-700">24. 騎樓深度</td><td className="p-4 text-right"><div className="flex items-center justify-end gap-2"><input type="number" name="arcadeDepth" value={inputs.arcadeDepth} onChange={handleInputChange} className="w-20 p-1 text-right border border-indigo-300 rounded font-bold text-indigo-600 bg-white"/> m</div></td><td className="p-4 text-right text-stone-500"></td>{isEditMode && <><td className="p-4 font-mono text-xs text-indigo-500">僅當前院=0時可用</td><td className="p-4 text-sm text-indigo-500">設定後1F自動退縮，樓高需>3m</td></>}</tr>)}
+                            {inputs.frontYardDepth == 0 && (
+                                <tr className="hover:bg-indigo-50/30 border-t-2 border-indigo-100">
+                                   <td className="p-4 pl-8 border-l-4 border-indigo-400 font-bold text-indigo-700">24. 騎樓深度</td>
+                                   <td className="p-4 text-right">
+                                       <div className="flex items-center justify-end gap-2">
+                                           <input type="number" name="arcadeDepth" value={inputs.arcadeDepth} onChange={handleInputChange} className="w-20 p-1 text-right border border-indigo-300 rounded font-bold text-indigo-600 bg-white"/> m
+                                       </div>
+                                   </td>
+                                   <td className="p-4 text-right text-stone-500"></td>
+                                   {isEditMode && <><td className="p-4 font-mono text-xs text-indigo-500">僅當前院=0時可用</td><td className="p-4 text-sm text-indigo-500">設定後1F自動退縮，樓高需>3m</td></>}
+                                </tr>
+                            )}
                          </tbody>
                       </table>
                    </div>

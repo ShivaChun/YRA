@@ -402,7 +402,7 @@
           );
       };
 
-      // BuildingLayer with Polygon & Curve Support (FIXED: Rendering Issues)
+      // BuildingLayer with Polygon & Curve Support (FIXED: Rotation Order & Review Box)
       const BuildingLayer = React.memo(({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
         if (!visible) return null;
         const thickness = isSlabMode ? Math.max(1.5, height * 0.08) : height;
@@ -426,6 +426,7 @@
         const finalBorder = isSlabMode ? `1px solid ${isViolation ? '#ef4444' : highlightColor}` : highlightBorder;
         const finalOpacity = isSlabMode ? (isViolation ? 0.8 : 0.95) : opacity;
 
+        // Generic Face helper
         const face = (w, h, tx, ty, tz, rx, ry, rz, bg, border, op) => ({
           width: `${w}px`, height: `${h}px`,
           position: 'absolute', left: '50%', top: '50%',
@@ -446,7 +447,6 @@
             const ptsPx = points.map(p => ({ x: (p.x || 0) * scale, y: (p.y || 0) * scale }));
             if (ptsPx.some(p => isNaN(p.x) || isNaN(p.y))) return null;
 
-            // FIX: Dynamic container size to avoid "Large Error Block" from oversize containers
             const minX = Math.min(...ptsPx.map(p=>p.x));
             const maxX = Math.max(...ptsPx.map(p=>p.x));
             const minY = Math.min(...ptsPx.map(p=>p.y));
@@ -490,6 +490,35 @@
                 const p2 = ptsPx[(i + 1) % ptsPx.length];
                 const curve = curves ? curves[i] : null;
 
+                const generateWallSeg = (pt1, pt2, key) => {
+                     const dx = pt2.x - pt1.x;
+                     const dy = pt2.y - pt1.y;
+                     const dist = Math.sqrt(dx*dx + dy*dy);
+                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                     const midX = (pt1.x + pt2.x) / 2;
+                     const midY = (pt1.y + pt2.y) / 2;
+                     
+                     // Custom transform for correct rotation (Z then X)
+                     // rotateZ(angle): Align with direction
+                     // rotateX(90): Stand up
+                     const customTransform = `translate3d(${midX}px, ${midY}px, ${thickness/2}px) rotateZ(${angle}deg) rotateX(90deg)`;
+
+                     walls.push(
+                         <div key={key} style={{
+                             width: `${dist + 0.5}px`, height: `${thickness}px`,
+                             position: 'absolute', left: '50%', top: '50%',
+                             marginLeft: `-${(dist + 0.5) / 2}px`, marginTop: `-${thickness / 2}px`,
+                             backgroundColor: highlightBg, border: finalBorder, boxSizing: 'border-box',
+                             transform: customTransform,
+                             opacity: finalOpacity,
+                             pointerEvents: 'auto', cursor: 'pointer',
+                             transition: 'all 0.5s',
+                             backfaceVisibility: 'visible',
+                             boxShadow: isSlabMode ? "inset 0 0 5px rgba(0,0,0,0.1)" : "none"
+                         }} />
+                     );
+                };
+
                 if (curve) {
                     const cp = { x: curve.x * scale, y: curve.y * scale };
                     let prevP = p1;
@@ -498,31 +527,11 @@
                         const tx = (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*p2.x;
                         const ty = (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*p2.y;
                         const currP = { x: tx, y: ty };
-                        
-                        const dx = currP.x - prevP.x;
-                        const dy = currP.y - prevP.y;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        // Fix angle: atan2(dy, dx)
-                        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                        const midX = (prevP.x + currP.x) / 2;
-                        const midY = (prevP.y + currP.y) / 2;
-                        
-                        // Slightly overlap walls to prevent tearing
-                        walls.push(
-                            <div key={`${i}-${k}`} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, 0, angle, highlightBg, finalBorder, finalOpacity)} />
-                        );
+                        generateWallSeg(prevP, currP, `${i}-${k}`);
                         prevP = currP;
                     }
                 } else {
-                    const dx = p2.x - p1.x;
-                    const dy = p2.y - p1.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                    const midX = (p1.x + p2.x) / 2;
-                    const midY = (p1.y + p2.y) / 2;
-                    walls.push(
-                        <div key={i} style={face(dist + 0.5, thickness, midX, midY, thickness/2, 90, 0, angle, highlightBg, finalBorder, finalOpacity)} />
-                    );
+                    generateWallSeg(p1, p2, i);
                 }
             }
 
@@ -537,33 +546,62 @@
                  clipPath: clipPath
             };
 
-            // FIX: 3D Wireframe Bounding Box for Review Mode
+            // FIX: Review Box Wireframe (Follow Shape)
             let reviewBox = null;
             if (isViolation || showFrame) {
                  const boxBorder = `2px dashed ${isViolation ? '#ef4444' : '#f43f5e'}`;
+                 const wireColor = isViolation ? '#ef4444' : '#f43f5e';
+                 
+                 // Generate wireframe walls (dashed)
+                 const wireWalls = [];
+                 for (let i = 0; i < ptsPx.length; i++) {
+                     const p1 = ptsPx[i];
+                     const p2 = ptsPx[(i + 1) % ptsPx.length];
+                     // Simplified wireframe: ignore curves for review box to keep it clean, or follow simple lines
+                     const dx = p2.x - p1.x;
+                     const dy = p2.y - p1.y;
+                     const dist = Math.sqrt(dx*dx + dy*dy);
+                     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                     const midX = (p1.x + p2.x) / 2;
+                     const midY = (p1.y + p2.y) / 2;
+                     
+                     wireWalls.push(
+                         <div key={`wire-${i}`} style={{
+                             width: `${dist}px`, height: `${thickness}px`,
+                             position: 'absolute', left: '50%', top: '50%',
+                             marginLeft: `-${dist/2}px`, marginTop: `-${thickness/2}px`,
+                             transform: `translate3d(${midX}px, ${midY}px, ${thickness/2}px) rotateZ(${angle}deg) rotateX(90deg)`,
+                             borderLeft: boxBorder, 
+                             borderRight: boxBorder,
+                             pointerEvents: 'none',
+                             opacity: 0.8
+                         }}/>
+                     );
+                 }
+                 
+                 // Generate Top/Bottom Wireframes using SVG
+                 const svgPath = generateSvgPath(points, curves, scale, -minX + padding, -minY + padding);
+                 
+                 const wireFace = (zOffset) => (
+                    <div style={{
+                        position: 'absolute', left: '50%', top: '50%',
+                        width: `${contW}px`, height: `${contH}px`,
+                        marginLeft: `-${contW/2}px`, marginTop: `-${contH/2}px`,
+                        transform: `translate3d(${bCx}px, ${bCy}px, ${zOffset}px)`,
+                        pointerEvents: 'none'
+                    }}>
+                        <svg width={contW} height={contH} viewBox={`0 0 ${contW} ${contH}`}>
+                            <path d={svgPath} fill="none" stroke={wireColor} strokeWidth="2" strokeDasharray="5,5" />
+                        </svg>
+                    </div>
+                 );
+
                  reviewBox = (
-                     <div className="pointer-events-none" style={{
-                         position: 'absolute', top:0, left:0, width:0, height:0,
-                         transform: `translate3d(${bCx}px, ${bCy}px, ${thickness/2}px)`
-                     }}>
-                         {/* Top Rect */}
-                         <div style={{
-                             position: 'absolute', width: `${bW}px`, height: `${bD}px`,
-                             border: boxBorder,
-                             transform: `translate(-50%, -50%) translateZ(${thickness/2}px)`
-                         }}/>
-                         {/* Bottom Rect */}
-                         <div style={{
-                             position: 'absolute', width: `${bW}px`, height: `${bD}px`,
-                             border: boxBorder,
-                             transform: `translate(-50%, -50%) translateZ(${-thickness/2}px)`
-                         }}/>
-                         {/* 4 Pillars */}
-                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(-${bW/2}px, -${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(${bW/2}px, -${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(${bW/2}px, ${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
-                         <div style={{position: 'absolute', width:0, height:`${thickness}px`, borderLeft: boxBorder, transform: `translate3d(-${bW/2}px, ${bD/2}px, -${thickness/2}px) rotateX(0deg)`}}/>
-                     </div>
+                     <>
+                        {wireWalls}
+                        {wireFace(thickness)}
+                        {wireFace(0)}
+                     </>
                  );
             }
 
@@ -611,7 +649,7 @@
       });
 
       // 2D Plan View Component with Shape Editing & CURVE SUPPORT
-      const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation }) => {
+      const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation, onClose }) => {
           // ... (Existing implementation)
           if (selectedFloorId) {
               const isBase = selectedFloorId === 'base';
@@ -620,7 +658,7 @@
               if (isBase) {
                   return (
                       <div className="w-full h-full flex items-center justify-center relative p-10">
-                          <button onClick={() => window.history.back()} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50"><X size={20}/></button>
+                          <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50"><X size={20}/></button>
                           <div className="text-stone-400">基地編輯功能開發中...</div>
                       </div>
                   )
@@ -864,9 +902,9 @@
 
               return (
                   <div className="w-full h-full flex flex-col relative overflow-hidden">
-                      <button onClick={() => window.history.back()} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50 shadow-md"><X size={20}/></button>
+                      <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-stone-200 rounded-full hover:bg-stone-300 z-50 shadow-md"><X size={20}/></button>
                       
-                      <div className="flex-1 flex items-center justify-center p-4 pb-32 transition-all duration-300" onClick={() => window.history.back()}>
+                      <div className="flex-1 flex items-center justify-center p-4 pb-32 transition-all duration-300" onClick={onClose}>
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <svg width={baseW + 100} height={baseH + 100} viewBox={`-${baseW/2 + 50} -${baseH/2 + 50} ${baseW + 100} ${baseH + 100}`} className="overflow-visible shadow-xl bg-white rounded-lg">
                                   <rect x={-baseW/2} y={-baseH/2} width={baseW} height={baseH} fill={isDarkMode ? "#1e293b" : "#f5f5f4"} stroke={isDarkMode ? "#475569" : "#d6d3d1"} strokeWidth="1" />
@@ -963,7 +1001,7 @@
                               onUpdateSetting={onUpdateSetting}
                               onReset={(id) => onUpdateSetting(id, 'reset')} 
                               isOpen={true}
-                              onClose={() => window.history.back()}
+                              onClose={onClose}
                               scale3d={scale3d}
                           />
                       )}
@@ -1387,7 +1425,7 @@
                 {/* 1. Added touch-none to container for Mobile Performance */}
                 <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 touch-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp} onClick={handleBgClick}>
                   <div className="absolute top-4 left-4 z-40 flex bg-white/90 backdrop-blur rounded-lg border border-stone-200 shadow-sm p-1 gap-1">
-                      <button onClick={() => { setViewMode('3d'); window.history.back(); }} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
+                      <button onClick={() => setViewMode('3d')} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
                       <button onClick={() => setViewMode('2d')} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '2d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><LayoutTemplate size={14} /> 平面分析</button>
                   </div>
                   <div className={controlBarClass}>
@@ -1397,7 +1435,7 @@
                   </div>
                   {isConstraintMode && viewMode === '3d' && (<div className="absolute bottom-24 right-6 z-20 pointer-events-none"><div className="bg-emerald-600/90 text-white px-3 py-1.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 backdrop-blur border border-emerald-400 animate-pulse"><CheckCircle2 size={16} fill="white" className="text-emerald-700" />鎖定編輯</div></div>)}
                   {viewMode === '2d' ? (
-                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id && id !== 'base') { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } else { window.history.back(); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} />
+                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id && id !== 'base') { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } else { setViewMode('3d'); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} onClose={() => setViewMode('3d')} />
                   ) : (
                       <>
                           {!isConstraintMode && <FloorInfoCard data={selectedFloor} isDarkMode={isDarkMode} onReset={resetFloor} isConstraintMode={isConstraintMode}/>}
@@ -1452,6 +1490,7 @@
                      </div>
                   </div>
                 </div>
+                {/* ... existing summary panel ... */}
                 <div className={`transition-all duration-500 ease-in-out border-l border-stone-200 bg-[#f8fafc] flex flex-col num-font z-10 relative overflow-hidden ${isSummaryOpen ? 'w-full md:w-96 opacity-100' : 'w-0 opacity-0 border-none'}`}>
                    <div className="flex-1 overflow-y-auto p-6">
                       <div className="mb-6 border-b border-stone-200 pb-4 sticky top-0 bg-white/95 backdrop-blur z-40 -mt-6 -mx-6 px-6 pt-6 shadow-sm">
@@ -1494,6 +1533,10 @@
         );
       };
 
+      // ... rest of the code (CheckLine, Si, CollapsibleSection, InputRow, SectionHeader, Cal, root.render)
+      // Since no changes are required in the latter part, I will just ensure the Visualizer3D close was correct.
+      // Wait, I need to include the rest of the file content to be a complete file as requested.
+      
       const CheckLine = React.memo(({ start, end, color, label, rotationZ, baseRotation, viewAngleX, visible, dashed, thick, labelPosRatio = 0.5, isDarkMode }) => {
         const dx = end.x - start.x;
         const dy = end.y - start.y;

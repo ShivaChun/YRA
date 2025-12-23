@@ -402,7 +402,7 @@
           );
       };
 
-      // BuildingLayer with Polygon & Curve Support (FIXED: Rotation Order & Review Box)
+      // BuildingLayer with Polygon & Curve Support
       const BuildingLayer = React.memo(({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
         if (!visible) return null;
         const thickness = isSlabMode ? Math.max(1.5, height * 0.08) : height;
@@ -1192,25 +1192,7 @@
           return () => element.removeEventListener('wheel', handleNativeWheel);
         }, []); 
         
-        // 3. Handle Back Button (History API)
-        useEffect(() => {
-          const handlePopState = (event) => {
-             // If we have a selected floor (2D editor open), close it
-             if (selectedFloor) {
-                 setSelectedFloor(null);
-                 setFocusOffset({ x: 0, y: 0, z: 0 });
-                 setZoom(Math.max(0.5, preSelectZoom));
-                 return;
-             }
-             // If we are in mobile fullscreen mode (summary closed), open summary (exit fullscreen)
-             if (isMobile && !isSummaryOpen) {
-                 setIsSummaryOpen(true);
-                 return;
-             }
-          };
-          window.addEventListener('popstate', handlePopState);
-          return () => window.removeEventListener('popstate', handlePopState);
-        }, [selectedFloor, isMobile, isSummaryOpen, preSelectZoom]);
+        // REMOVED: History API handling for simple switching
 
         const getTouchDistance = (touches) => Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
         const handleMouseDown = (e) => { if (viewMode === '2d') return; setIsDragging(true); lastMousePos.current = { x: e.clientX, y: e.clientY }; };
@@ -1230,7 +1212,6 @@
           lastMousePos.current = { x: e.clientX, y: e.clientY };
         };
         
-        // 1. & 2. Optimize Touch Move & Landscape Logic
         const handleTouchMove = (e) => {
           if (e.touches.length === 2 && lastPinchDist.current !== null) { 
               const currentDist = getTouchDistance(e.touches); 
@@ -1241,7 +1222,6 @@
           }
           if (!isDragging || e.touches.length !== 1) return;
           
-          // Throttling with requestAnimationFrame for performance
           if (rafRef.current) return;
 
           const clientX = e.touches[0].clientX;
@@ -1251,11 +1231,6 @@
               const deltaX = clientX - lastMousePos.current.x;
               const deltaY = clientY - lastMousePos.current.y;
               
-              // 2. Landscape Coordinate Mapping: Rotate inputs 90deg
-              // Normal: DeltaX -> RotZ, DeltaY -> AngleX
-              // Rotated 90deg (Clockwise container): 
-              //   Physical "Up" (Finger Y-) -> Visual "Left" (X-) -> Should increase AngleX (Tilt Up)
-              //   Physical "Right" (Finger X+) -> Visual "Up" (Y-) -> Should increase RotZ (Spin)
               let effectiveDeltaX = isLandscapeMode ? deltaY : deltaX;
               let effectiveDeltaY = isLandscapeMode ? -deltaX : deltaY;
               
@@ -1277,24 +1252,28 @@
             if (!selectedFloor) setPreSelectZoom(zoom);
             const settings = floorSettings[layer.id] || {};
             
-            // Push history state when opening editor
-            window.history.pushState({ type: 'editor' }, '');
+            // REMOVED: window.history.pushState({ type: 'editor' }, '');
 
             setSelectedFloor({ ...layer, rotation: layer.rotation || 0, pivot: settings.pivot || { x: 0, y: 0 }, alignment: settings.alignment || { x: 'left', y: 'back' }, violations: layer.violations || [], points: settings.points || null, curves: settings.curves || null });
             const targetZ = layer.z + layer.height * 0.5;
             setFocusOffset({ x: -layer.shiftX, y: -layer.shiftYPx, z: -targetZ });
             setZoom(2.5);
         };
-        const handleBgClick = () => { if (selectedFloor) { window.history.back(); } }; // Use back to close
+        const handleBgClick = () => { 
+            if (selectedFloor) { 
+                setSelectedFloor(null); // Simple switch, no history.back()
+            } 
+        }; 
         
         const toggleFullscreen = () => {
              if (isSummaryOpen) {
                  // Entering fullscreen
-                 window.history.pushState({ type: 'fullscreen' }, '');
+                 // REMOVED: window.history.pushState({ type: 'fullscreen' }, '');
                  setIsSummaryOpen(false);
              } else {
                  // Exiting fullscreen
-                 window.history.back();
+                 // REMOVED: window.history.back();
+                 setIsSummaryOpen(true);
              }
         };
 
@@ -1413,7 +1392,7 @@
         const visualFloorsAbove = massingLayers.totalFloors;
         const totalAreaViolation = massingLayers.currentTotalUsed > volumeLimit; 
         const renderRoads = () => inputs.roads.map((r, idx) => { const rW = parseFloat(r.width) * scale; const orientation = r.orientation; const ext = 50 * scale; let style = {}; if (orientation === 'bottom') { style = { width: `calc(100% + ${ext*2}px)`, height: `${rW}px`, top: '100%', left: `-${ext}px`, transform: `translateY(2px)` }; } else if (orientation === 'top') { style = { width: `calc(100% + ${ext*2}px)`, height: `${rW}px`, bottom: '100%', left: `-${ext}px`, transform: `translateY(-2px)` }; } else if (orientation === 'left') { style = { width: `${rW}px`, height: `calc(100% + ${ext*2}px)`, right: '100%', top: `-${ext}px`, transform: `translateX(-2px)` }; } else { style = { width: `${rW}px`, height: `calc(100% + ${ext*2}px)`, left: '100%', top: `-${ext}px`, transform: `translateX(2px)` }; } return ( <div key={r.id} className={`absolute flex items-center justify-center text-sm font-bold border-dashed border-stone-300 z-10 ${isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-400' : 'bg-stone-200/50 text-stone-600'}`} style={{ ...style, position: 'absolute' }}>{r.name} ({r.width}m)</div> ); });
-        // 2. Fixed Landscape Style Logic for Mobile
+        
         const landscapeStyle = isLandscapeMode ? { position: 'fixed', top: 0, left: '100vw', width: '100dvh', height: '100vw', transform: 'rotate(90deg)', transformOrigin: 'top left', zIndex: 9999, margin: 0, borderRadius: 0, touchAction: 'none', backgroundColor: isDarkMode ? '#0f172a' : '#fafaf9' } : { backgroundImage: colors.grid, backgroundSize: '40px 40px', touchAction: 'none' };
         const controlBarClass = isLandscapeMode ? "absolute top-6 right-6 z-30 flex gap-2" : "absolute top-4 right-4 z-30 flex gap-2";
         const viewTransition = isDragging ? 'none' : 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
@@ -1422,7 +1401,7 @@
         return (
           <div className="bg-[#fdfbf7] rounded-xl p-0 mb-6 shadow-md overflow-hidden relative min-h-[350px] md:min-h-[600px] flex flex-col md:flex-row border border-stone-300 font-['GenYoGothic',_sans-serif] md:sticky md:top-0 md:z-40">
              <div className="flex flex-col md:flex-row w-full h-full relative">
-                {/* 1. Added touch-none to container for Mobile Performance */}
+                
                 <div ref={viewportRef} className={`flex-1 relative flex flex-col items-center justify-center perspective-1000 min-h-[350px] md:min-h-[600px] overflow-hidden transition-colors duration-500 touch-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-slate-900' : 'bg-[#fafaf9]'}`} style={{ ...landscapeStyle, ...(isLandscapeMode ? {} : { backgroundImage: colors.grid, backgroundSize: '40px 40px' }) }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp} onClick={handleBgClick}>
                   <div className="absolute top-4 left-4 z-40 flex bg-white/90 backdrop-blur rounded-lg border border-stone-200 shadow-sm p-1 gap-1">
                       <button onClick={() => setViewMode('3d')} className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold transition-colors ${viewMode === '3d' ? 'bg-stone-800 text-white' : 'text-stone-500 hover:bg-stone-100'}`}><Box size={14} /> 3D 模擬</button>
@@ -1435,7 +1414,42 @@
                   </div>
                   {isConstraintMode && viewMode === '3d' && (<div className="absolute bottom-24 right-6 z-20 pointer-events-none"><div className="bg-emerald-600/90 text-white px-3 py-1.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 backdrop-blur border border-emerald-400 animate-pulse"><CheckCircle2 size={16} fill="white" className="text-emerald-700" />鎖定編輯</div></div>)}
                   {viewMode === '2d' ? (
-                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id && id !== 'base') { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } else { setViewMode('3d'); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} onClose={() => setViewMode('3d')} />
+                      <PlanAnalysis2D 
+                          layers={floorLayers} 
+                          baseWidthM={baseWidthM} 
+                          baseDepthM={baseDepthM} 
+                          onSelectFloor={(id) => { 
+                             // FIX: Handle 'base' correctly
+                             if (id === 'base') {
+                                 setSelectedFloor({ id: 'base' });
+                             } else if (id) { 
+                                 const l = floorLayers.find(f => f.id === id); 
+                                 if (l) handleLayerClick({ stopPropagation: () => {} }, l); 
+                             } 
+                          }} 
+                          selectedFloorId={selectedFloor?.id} 
+                          isDarkMode={isDarkMode} 
+                          onUpdateSetting={updateFloorSetting} 
+                          floorSettings={floorSettings} 
+                          inputs={inputs} 
+                          scale3d={scale} 
+                          basements={basements} 
+                          onToggleBasement={toggleBasement} 
+                          activeBasementArea={activeBasementArea} 
+                          totalAllowedArea={res.totalCFA} 
+                          showCheckLines={showCheckLines} 
+                          volumeLimit={volumeLimit} 
+                          parkingOn1F={parkingOn1F} 
+                          onToggleParkingLocation={toggleParkingLocation} 
+                          onClose={() => {
+                              // FIX: Simple Switch Logic
+                              if (selectedFloor) {
+                                  setSelectedFloor(null);
+                              } else {
+                                  setViewMode('3d');
+                              }
+                          }} 
+                      />
                   ) : (
                       <>
                           {!isConstraintMode && <FloorInfoCard data={selectedFloor} isDarkMode={isDarkMode} onReset={resetFloor} isConstraintMode={isConstraintMode}/>}
@@ -1490,7 +1504,7 @@
                      </div>
                   </div>
                 </div>
-                {/* ... existing summary panel ... */}
+                
                 <div className={`transition-all duration-500 ease-in-out border-l border-stone-200 bg-[#f8fafc] flex flex-col num-font z-10 relative overflow-hidden ${isSummaryOpen ? 'w-full md:w-96 opacity-100' : 'w-0 opacity-0 border-none'}`}>
                    <div className="flex-1 overflow-y-auto p-6">
                       <div className="mb-6 border-b border-stone-200 pb-4 sticky top-0 bg-white/95 backdrop-blur z-40 -mt-6 -mx-6 px-6 pt-6 shadow-sm">
@@ -1533,10 +1547,6 @@
         );
       };
 
-      // ... rest of the code (CheckLine, Si, CollapsibleSection, InputRow, SectionHeader, Cal, root.render)
-      // Since no changes are required in the latter part, I will just ensure the Visualizer3D close was correct.
-      // Wait, I need to include the rest of the file content to be a complete file as requested.
-      
       const CheckLine = React.memo(({ start, end, color, label, rotationZ, baseRotation, viewAngleX, visible, dashed, thick, labelPosRatio = 0.5, isDarkMode }) => {
         const dx = end.x - start.x;
         const dy = end.y - start.y;

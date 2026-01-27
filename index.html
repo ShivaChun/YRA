@@ -801,7 +801,7 @@
           </div>
       );
 
-      const BuildingLayer = React.memo(({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves }) => {
+      const BuildingLayer = React.memo(({ width, depth, height, x, y, z, rotation, pivot, scale, color, strokeColor, opacity, visible, showFrame, isSlabMode, animate, delay, isDarkMode, onClick, isSelected, isViolation, points, curves, staticPoints, unusedReviewArea }) => {
         if (!visible) return null;
         const thickness = isSlabMode ? Math.max(1.5, height * 0.08) : height;
         const pivotX = (pivot?.x || 0) * scale;
@@ -822,8 +822,10 @@
           width: `${w}px`, height: `${h}px`, position: 'absolute', left: '50%', top: '50%', marginLeft: `-${w / 2}px`, marginTop: `-${h / 2}px`, backgroundColor: bg, border: border, boxSizing: 'border-box', transform: `translate3d(${tx}px, ${ty}px, ${tz}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`, opacity: op, pointerEvents: 'auto', cursor: 'pointer', transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)', backfaceVisibility: 'visible', animation: isViolation ? 'pulse-red 3s infinite' : 'none', boxShadow: isDarkMode ? (isSlabMode ? "inset 0 0 15px rgba(255,255,255,0.1)" : "none") : (isSlabMode ? "inset 0 0 5px rgba(0,0,0,0.1)" : "none")
         });
 
-        if (points && points.length > 0) {
-            const ptsPx = points.map(p => ({ x: (p.x || 0) * scale, y: (p.y || 0) * scale }));
+        // Helper to generate SVG Path for Polygon
+        const getPolyData = (pts, crvs) => {
+            if (!pts || pts.length === 0) return null;
+            const ptsPx = pts.map(p => ({ x: (p.x || 0) * scale, y: (p.y || 0) * scale }));
             if (ptsPx.some(p => isNaN(p.x) || isNaN(p.y))) return null;
             const minX = Math.min(...ptsPx.map(p=>p.x)); const maxX = Math.max(...ptsPx.map(p=>p.x)); const minY = Math.min(...ptsPx.map(p=>p.y)); const maxY = Math.max(...ptsPx.map(p=>p.y));
             const bCx = (maxX + minX) / 2; const bCy = (maxY + minY) / 2;
@@ -831,12 +833,21 @@
             let d = `M ${(ptsPx[0].x - minX + padding)} ${(ptsPx[0].y - minY + padding)}`;
             for (let i = 0; i < ptsPx.length; i++) {
                 const pNext = ptsPx[(i + 1) % ptsPx.length];
-                const curve = curves ? curves[i] : null;
+                const curve = crvs ? crvs[i] : null;
                 const nextX = pNext.x - minX + padding; const nextY = pNext.y - minY + padding;
                 if (curve) { const cpX = curve.x * scale - minX + padding; const cpY = curve.y * scale - minY + padding; d += ` Q ${cpX} ${cpY}, ${nextX} ${nextY}`; } else { d += ` L ${nextX} ${nextY}`; }
             }
             d += " Z";
-            const clipPath = `path('${d}')`;
+            return { d, contW, contH, bCx, bCy };
+        };
+
+        if (points && points.length > 0) {
+            const polyData = getPolyData(points, curves);
+            if (!polyData) return null;
+            const { d, contW, contH, bCx, bCy } = polyData;
+            
+            // Generate Walls
+            const ptsPx = points.map(p => ({ x: (p.x || 0) * scale, y: (p.y || 0) * scale }));
             const walls = []; const segmentsForCurve = 8; 
             for (let i = 0; i < ptsPx.length; i++) {
                 const p1 = ptsPx[i]; const p2 = ptsPx[(i + 1) % ptsPx.length]; const curve = curves ? curves[i] : null;
@@ -849,12 +860,27 @@
                     for(let k=1; k<=segmentsForCurve; k++) { const t = k / segmentsForCurve; const tx = (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*p2.x; const ty = (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*p2.y; const currP = { x: tx, y: ty }; generateWallSeg(prevP, currP, `${i}-${k}`); prevP = currP; }
                 } else { generateWallSeg(p1, p2, i); }
             }
-            // Lift stroke faces slightly to avoid z-fighting
+
+            const clipPath = `path('${d}')`;
             const topFaceStyle = { ...face(contW, contH, bCx, bCy, thickness, 0, 0, 0, highlightBg, 'none', finalOpacity + 0.1), clipPath: clipPath, filter: isSelected ? 'brightness(1.1)' : 'none' };
             const strokeFaceStyle = { ...face(contW, contH, bCx, bCy, thickness + 0.5, 0, 0, 0, 'transparent', 'none', 1), pointerEvents: 'none' };
             const bottomStrokeFaceStyle = { ...face(contW, contH, bCx, bCy, 0, 0, 0, 0, 'transparent', 'none', 1), pointerEvents: 'none' };
             const bottomFaceStyle = { ...face(contW, contH, bCx, bCy, 0, 0, 0, 0, highlightBg, 'none', finalOpacity), clipPath: clipPath };
+            
+            // Ghost (Static) Layer Logic
+            let ghostLayer = null;
+            if (staticPoints && staticPoints.length > 0) {
+                 const gPoly = getPolyData(staticPoints, curves);
+                 if (gPoly) {
+                     const gClip = `path('${gPoly.d}')`;
+                     // Red transparent style
+                     const ghostStyle = { ...face(gPoly.contW, gPoly.contH, gPoly.bCx, gPoly.bCy, thickness - 1, 0, 0, 0, "#ef4444", 'none', 0.2), clipPath: gClip, pointerEvents: 'none' };
+                     ghostLayer = <div style={ghostStyle} />;
+                 }
+            }
+
             return ( <div className="absolute" onClick={onClick} style={{ left: '50%', top: '50%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: `translate3d(${x}px, ${y}px, ${z}px) rotateZ(${rotation || 0}deg)`, animation: animate ? `riseUp 0.8s ease-out ${delay}ms backwards` : 'none', '--tx': `${x}px`, '--ty': `${y}px`, '--tz': `${z}px` }}> 
+                {ghostLayer}
                 {walls} 
                 <div style={{...topFaceStyle, backfaceVisibility: 'hidden'}} className="hover:brightness-110" />
                 {showStroke && (
@@ -872,13 +898,20 @@
                         </svg>
                     </div>
                 )}
+                {unusedReviewArea > 0.1 && (
+                     <div style={{ position: 'absolute', top: 0, left: 0, width: '100px', height: '20px', transform: `translate3d(${bCx}px, ${bCy}px, ${thickness + 10}px) rotateX(-90deg)`, pointerEvents: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                         <div className="bg-red-500/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm backdrop-blur-sm whitespace-nowrap">
+                            -{unusedReviewArea.toFixed(1)}坪
+                         </div>
+                     </div>
+                 )}
             </div> );
         }
         const topFaceStyle = { ...face(width, depth, 0, 0, thickness, 0, 0, 0, highlightBg, finalBorder, finalOpacity + 0.1), filter: isSelected ? 'brightness(1.1)' : 'none' };
         return ( <div className="absolute" onClick={onClick} style={{ left: '50%', top: '50%', width: 0, height: 0, transformStyle: 'preserve-3d', transform: `translate3d(${x}px, ${y}px, ${z}px) rotateZ(${rotation || 0}deg)`, transformOrigin: `calc(50% + ${pivotX}px) calc(50% - ${pivotY}px)`, animation: animate ? `riseUp 0.8s ease-out ${delay}ms backwards` : 'none', '--tx': `${x}px`, '--ty': `${y}px`, '--tz': `${z}px` }}> <div style={face(width, thickness, 0, depth/2, thickness/2, 90, 0, 0, highlightBg, finalBorder, finalOpacity)} /> <div style={face(width, thickness, 0, -depth/2, thickness/2, -90, 0, 0, highlightBg, finalBorder, finalOpacity)} /> <div style={face(depth, thickness, width/2, 0, thickness/2, 0, 90, 90, highlightBg, finalBorder, finalOpacity)} /> <div style={face(depth, thickness, -width/2, 0, thickness/2, 0, 90, -90, highlightBg, finalBorder, finalOpacity)} /> <div style={topFaceStyle} className="hover:brightness-110" /> <div style={face(width, depth, 0, 0, 0, 0, 0, 0, highlightBg, finalBorder, finalOpacity)} /> </div> );
       });
 
-      const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation, onClose, basePoints, baseCurves, onAddRoad, excavationPoints, excavationCurves, frontageIndices, onUpdateFrontageIndices, onAddFloor, onRemoveFloor, edgeTypes, onUpdateEdgeTypes, view, onUpdateView, onUpdateInputs, onUpdateRoads, onEditEnd }) => {
+      const PlanAnalysis2D = ({ layers, baseWidthM, baseDepthM, onSelectFloor, selectedFloorId, isDarkMode, onUpdateSetting, floorSettings, inputs, scale3d, basements, onToggleBasement, activeBasementArea, totalAllowedArea, showCheckLines, volumeLimit, parkingOn1F, onToggleParkingLocation, onClose, basePoints, baseCurves, onAddRoad, excavationPoints, excavationCurves, frontageIndices, onUpdateFrontageIndices, onAddFloor, onRemoveFloor, edgeTypes, onUpdateEdgeTypes, view, onUpdateView, onUpdateInputs, onUpdateRoads, onEditEnd, unitSettings, onUpdateUnitSettings }) => {
           
           // 1. Calculate Default Points (Temporary display only)
           const defaultBasePts = useMemo(() => {
@@ -954,6 +987,15 @@
           const longPressTimer = useRef(null);
           const [isAreaLocked, setIsAreaLocked] = useState(false); // Task 1 Area Lock
           const lockedAreaRef = useRef(null);
+
+          // Task 3: Unit Split State (Lifted to Visualizer3D)
+          // const [isUnitSplitMode, setIsUnitSplitMode] = useState(false);
+          // const [splitParams, setSplitParams] = useState({ axis: 'x', ratio: 0.5, gap: 0 });
+          
+          const previewUnits = useMemo(() => {
+              if (!unitSettings?.enabled || !displayLayer?.points) return null;
+              return splitPolygon(displayLayer.points, unitSettings.axis, unitSettings.ratio, unitSettings.gap);
+          }, [unitSettings, displayLayer?.points]);
 
           const handleDragStart = (e) => { if (e.button !== 0) return; if (e.target.dataset.type === 'control-point' || e.target.dataset.type === 'edge-line' || e.target.dataset.type === 'curve-handle') return; e.stopPropagation(); isDragging.current = true; lastPos.current = { x: e.clientX, y: e.clientY }; e.target.setPointerCapture(e.pointerId); setSelectedPointForEdit(null); setSelectedCurveForEdit(null); };
 
@@ -1142,7 +1184,44 @@
           
           return (
               <div className="w-full h-full flex flex-col relative overflow-hidden bg-stone-50" ref={containerRef} onPointerDown={(e) => { e.stopPropagation(); handlePanStart(e); }} onClick={(e) => e.stopPropagation()}>
-                  {displayLayer && ( <button onClick={onClose} className="absolute top-4 left-4 p-2 bg-white/90 rounded-full hover:bg-red-50 text-stone-500 hover:text-red-500 z-50 shadow-md border border-stone-200 transition-colors" title="結束編輯"> <Undo2 size={20}/> </button> )}
+                  {displayLayer && (
+                      <div className="absolute top-4 left-4 z-50 flex gap-2">
+                          <button onClick={onClose} className="p-2 bg-white/90 rounded-full hover:bg-red-50 text-stone-500 hover:text-red-500 shadow-md border border-stone-200 transition-colors" title="結束編輯"> <Undo2 size={20}/> </button>
+                          {selectedFloorId !== 'base' && selectedFloorId !== 'excavation' && (
+                              <button onClick={() => onUpdateUnitSettings(prev => ({...prev, enabled: !prev.enabled}))} className={`p-2 rounded-full shadow-md border transition-colors flex items-center gap-1 text-xs font-bold px-3 ${unitSettings?.enabled ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white/90 text-stone-600 border-stone-200 hover:bg-indigo-50'}`}>
+                                  <LayoutDashboard size={16}/> 分戶功能
+                              </button>
+                          )}
+                      </div>
+                  )}
+                  {unitSettings?.enabled && displayLayer && (
+                      <div className="absolute top-16 left-4 z-50 bg-white p-4 rounded shadow-lg border border-stone-200 w-64">
+                          <h3 className="font-bold text-sm mb-2">分戶設定</h3>
+                          <div className="mb-2">
+                              <label className="text-xs text-stone-500 block">分割方向</label>
+                              <div className="flex gap-2 mt-1">
+                                  <button onClick={()=>onUpdateUnitSettings(p=>({...p, axis:'x'}))} className={`flex-1 text-xs py-1 border rounded ${unitSettings.axis==='x'?'bg-indigo-50 border-indigo-500 text-indigo-600':'bg-stone-50'}`}>垂直 (X)</button>
+                                  <button onClick={()=>onUpdateUnitSettings(p=>({...p, axis:'y'}))} className={`flex-1 text-xs py-1 border rounded ${unitSettings.axis==='y'?'bg-indigo-50 border-indigo-500 text-indigo-600':'bg-stone-50'}`}>水平 (Y)</button>
+                              </div>
+                          </div>
+                          <div className="mb-2">
+                              <label className="text-xs text-stone-500 block">分割比例 ({Math.round(unitSettings.ratio*100)}:{Math.round((1-unitSettings.ratio)*100)})</label>
+                              <input type="range" min="0.1" max="0.9" step="0.05" value={unitSettings.ratio} onChange={(e)=>onUpdateUnitSettings(p=>({...p, ratio: parseFloat(e.target.value)}))} className="w-full" />
+                          </div>
+                          <div className="mb-4">
+                              <label className="text-xs text-stone-500 block">棟距 (Gap): {unitSettings.gap}m</label>
+                              <input type="range" min="0" max="5" step="0.1" value={unitSettings.gap} onChange={(e)=>onUpdateUnitSettings(p=>({...p, gap: parseFloat(e.target.value)}))} className="w-full" />
+                          </div>
+                          <div className="flex gap-2">
+                              <button onClick={()=>{
+                                   const units = splitPolygon(displayLayer.points, unitSettings.axis, unitSettings.ratio, unitSettings.gap);
+                                   updateSetting(displayLayer.id, 'units', units);
+                                   onUpdateUnitSettings(prev => ({...prev, enabled: false}));
+                              }} className="flex-1 bg-indigo-600 text-white text-xs py-1.5 rounded hover:bg-indigo-700">確認分割</button>
+                              <button onClick={()=>onUpdateUnitSettings(prev => ({...prev, enabled: false}))} className="flex-1 bg-white border border-stone-300 text-stone-600 text-xs py-1.5 rounded hover:bg-stone-50">取消</button>
+                          </div>
+                      </div>
+                  )}
                   {/* Zoom Buttons for Shape Edit Mode */}
                   <div className="absolute top-4 right-4 z-50 flex flex-col gap-2">
                       <div className="flex flex-col bg-white shadow rounded-lg border border-stone-200 overflow-hidden">
@@ -1176,7 +1255,13 @@
                                      )}
                                       {displayLayer.points ? (
                                           <>
-                                              <path d={generatePath()} fill={selectedFloorId === 'excavation' ? "rgba(245, 158, 11, 0.1)" : (displayLayer.isViolation ? "rgba(239, 68, 68, 0.5)" : (selectedFloorId === 'base' ? "#f5f5f4" : (isDarkMode ? "#38bdf8" : "#0ea5e9")))} stroke={selectedFloorId === 'excavation' ? "#f59e0b" : (displayLayer.isViolation ? "#ef4444" : (selectedFloorId === 'base' ? "#78716c" : "#0284c7"))} strokeWidth={selectedFloorId === 'excavation' ? "2" : "2"} strokeDasharray={selectedFloorId === 'excavation' ? "4,2" : "none"} opacity="0.9" />
+                                              {previewUnits ? (
+                                                  previewUnits.map((pts, i) => (
+                                                      <path key={`preview-${i}`} d={generateSvgPath(pts, null, scale)} fill="rgba(99, 102, 241, 0.5)" stroke="#4f46e5" strokeWidth="2" />
+                                                  ))
+                                              ) : (
+                                                  <path d={generatePath()} fill={selectedFloorId === 'excavation' ? "rgba(245, 158, 11, 0.1)" : (displayLayer.isViolation ? "rgba(239, 68, 68, 0.5)" : (selectedFloorId === 'base' ? "#f5f5f4" : (isDarkMode ? "#38bdf8" : "#0ea5e9")))} stroke={selectedFloorId === 'excavation' ? "#f59e0b" : (displayLayer.isViolation ? "#ef4444" : (selectedFloorId === 'base' ? "#78716c" : "#0284c7"))} strokeWidth={selectedFloorId === 'excavation' ? "2" : "2"} strokeDasharray={selectedFloorId === 'excavation' ? "4,2" : "none"} opacity="0.9" />
+                                              )}
                                               {displayLayer.points.map((p, i) => {
                                                   const nextI = (i + 1) % displayLayer.points.length; const nextP = displayLayer.points[nextI]; const isLocked = lockedEdgeIndices.has(i); const curve = displayLayer.curves?.[i];
                                                   const isFrontage = selectedFloorId === 'base' && vizFrontIndices.has(i);
@@ -1257,6 +1342,40 @@
           return { points: newPoints, curves: newCurves, centroid };
       };
 
+        const splitPolygon = (points, axis, ratio, gap) => {
+            if (!points || points.length < 3) return [points];
+            const xs = points.map(p => p.x); const ys = points.map(p => p.y);
+            const minX = Math.min(...xs); const maxX = Math.max(...xs);
+            const minY = Math.min(...ys); const maxY = Math.max(...ys);
+            const w = maxX - minX; const h = maxY - minY;
+            const cutVal = axis === 'x' ? (minX + w * ratio) : (minY + h * ratio);
+            const limit1 = cutVal - gap/2;
+            const limit2 = cutVal + gap/2;
+            
+            const clip = (pts, isKeep, limit) => {
+                const newPts = [];
+                for (let i = 0; i < pts.length; i++) {
+                    const p1 = pts[i]; const p2 = pts[(i + 1) % pts.length];
+                    const v1 = axis === 'x' ? p1.x : p1.y; const v2 = axis === 'x' ? p2.x : p2.y;
+                    const in1 = isKeep(v1); const in2 = isKeep(v2);
+                    if (in1) {
+                        newPts.push(p1);
+                        if (!in2 && v2 !== v1) {
+                            const alpha = (limit - v1) / (v2 - v1);
+                            newPts.push({ x: p1.x + (p2.x - p1.x) * alpha, y: p1.y + (p2.y - p1.y) * alpha });
+                        }
+                    } else if (in2 && v2 !== v1) {
+                        const alpha = (limit - v1) / (v2 - v1);
+                        newPts.push({ x: p1.x + (p2.x - p1.x) * alpha, y: p1.y + (p2.y - p1.y) * alpha });
+                    }
+                }
+                return newPts.length >= 3 ? newPts : null;
+            };
+            const p1 = clip(points, (v) => v <= limit1, limit1);
+            const p2 = clip(points, (v) => v >= limit2, limit2);
+            return [p1, p2].filter(p => p !== null);
+        };
+
       const Visualizer3D = ({ inputs, res, onUpdateBaseDim, onResetAll, onUpdateRoads, onUpdateInputs, showCheckLines, setShowCheckLines, showWeiLao, setShowWeiLao, isConstraintMode, setIsConstraintMode, onUnusedAreaChange }) => {
   const [animate, setAnimate] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -1265,6 +1384,9 @@
         const [selectedFloor, setSelectedFloor] = useState(null);
         const [focusOffset, setFocusOffset] = useState({ x: 0, y: 0, z: 0 });
         const [floorSettings, setFloorSettings] = useState({});
+        // Task: Unit Settings State
+        const [unitSettings, setUnitSettings] = useState({ enabled: false, axis: 'x', ratio: 0.5, gap: 0 });
+
         const floorsBelow = Math.max(0, parseInt(inputs.floorsBelow) || 0);
         const [basementState, setBasementState] = useState({}); 
         const [parkingOn1F, setParkingOn1F] = useState(true);
@@ -1416,7 +1538,7 @@
            }
            if (floorId === 'excavation') { if (field === 'points') setExcavationPoints(value); if (field === 'reset') { setExcavationPoints(null); setExcavationCurves(null); } return; }
            if (field === 'reset') { setFloorSettings(prev => { const copy = {...prev}; delete copy[floorId]; return copy; }); return; }
-           setFloorSettings(prev => { const current = prev[floorId] || {}; let newData = { ...current }; if (field.startsWith('align_')) { const axis = field.split('_')[1]; const alignment = { ...(current.alignment || { x: 'left', y: 'back' }), [axis]: value }; newData.alignment = alignment; } else if (field.startsWith('pivot')) { const axis = field === 'pivotX' ? 'x' : 'y'; const pivot = { ...(current.pivot || { x: 0, y: 0 }), [axis]: value }; newData.pivot = pivot; } else if (field === 'area') { newData.area = value; newData.manualArea = true; } else if (field === 'points') { if (value && value.length >= 3) { let area = calculatePolygonArea(value); newData.area = area; newData.manualArea = true; } newData.points = value; } else if (field === 'curves') { newData.curves = value; } else if (field === 'offset_delta') { const currentOff = current.offset || { x: 0, y: 0 }; newData.offset = { x: currentOff.x + value.x, y: currentOff.y + value.y }; } else { newData[field] = value; if (field === 'width' || field === 'depth') newData.manualDim = true; } return { ...prev, [floorId]: newData }; });
+           setFloorSettings(prev => { const current = prev[floorId] || {}; let newData = { ...current }; if (field.startsWith('align_')) { const axis = field.split('_')[1]; const alignment = { ...(current.alignment || { x: 'left', y: 'back' }), [axis]: value }; newData.alignment = alignment; } else if (field.startsWith('pivot')) { const axis = field === 'pivotX' ? 'x' : 'y'; const pivot = { ...(current.pivot || { x: 0, y: 0 }), [axis]: value }; newData.pivot = pivot; } else if (field === 'area') { newData.area = value; newData.manualArea = true; } else if (field === 'points') { if (value && value.length >= 3) { let area = calculatePolygonArea(value); newData.area = area; newData.manualArea = true; } newData.points = value; } else if (field === 'curves') { newData.curves = value; } else if (field === 'units') { newData.units = value; newData.manualArea = true; } else if (field === 'offset_delta') { const currentOff = current.offset || { x: 0, y: 0 }; newData.offset = { x: currentOff.x + value.x, y: currentOff.y + value.y }; } else { newData[field] = value; if (field === 'width' || field === 'depth') newData.manualDim = true; } return { ...prev, [floorId]: newData }; });
         };
         
         const handleBaseEditEnd = (floorId, points) => {
@@ -1442,7 +1564,6 @@
         };
 
         const resetFloor = (floorId) => { setFloorSettings(prev => { const copy = { ...prev }; delete copy[floorId]; return copy; }); };
-        useEffect(() => { if (selectedFloor) { const layer = massingLayers.layers.find(l => l.id === selectedFloor.id); if (layer) { setSelectedFloor({ ...layer, rotation: floorSettings[layer.id]?.rotation || 0, pivot: floorSettings[layer.id]?.pivot || { x: 0, y: 0 }, alignment: floorSettings[layer.id]?.alignment || { x: 'left', y: 'back' }, violations: layer.violations, points: floorSettings[layer.id]?.points || null, curves: floorSettings[layer.id]?.curves || null }); } } }, [floorSettings, isConstraintMode]);
 
         const updateEdgeTypes = (index, type) => { setEdgeTypes(prev => { if (index === null && typeof type === 'object') { return type; } const next = { ...prev }; if (next[index] === type) { delete next[index]; } else { next[index] = type; } return next; }); };
 
@@ -1574,15 +1695,6 @@
             if (!sameEdgeTypes(edgeTypes || {}, nextEdgeTypes)) setEdgeTypes(nextEdgeTypes);
         }, [basePoints, baseCurves, baseWidthM, baseDepthM, inputs.roads, frontageIndices, edgeTypes]);
 
-          const handleAddFloor = () => { 
-    if (massingLayers.currentTotalUsed >= res.totalCFA) {
-        alert("已達最大允建總樓地板面積 (Total CFA) 上限，無法新增樓層。");
-        return;
-    }
-              setManualFloorsOverride((prev) => (prev !== null ? prev : massingLayers.totalFloors) + 1); 
-          };
-        const handleRemoveFloor = () => { const newFloorsAbove = Math.max(1, (manualFloorsOverride !== null ? manualFloorsOverride : massingLayers.totalFloors) - 1); setManualFloorsOverride(newFloorsAbove); onUpdateInputs('floorsAbove', newFloorsAbove); if (selectedFloor && !['base', 'excavation'].includes(selectedFloor.id)) { const floorNum = parseInt(selectedFloor.id); if (!isNaN(floorNum) && floorNum > newFloorsAbove) { setSelectedFloor(null); } } };
-
         // 標準化點座標 (Normalize points)
         const normalizePoints = (points) => {
             if (!points) return null;
@@ -1710,7 +1822,8 @@
                 oneFFootprint = res ? res.points : null;
             }
 
-            while ((remainingAreaM2 > 0.1 || floorCount < res.floorsAbove) && floorCount < maxSimulatedFloors) {
+            // Fix: Strict Area/Floor limit check to avoid generating unused residual areas
+            while (remainingAreaM2 > 0.1 && floorCount < res.floorsAbove && floorCount < maxSimulatedFloors) {
                 if (remainingAreaM2 <= 0.1 && manualFloorsOverride === null) break;
                 const floorId = `${floorCount + 1}F`;
                 const settings = floorSettings[floorId] || {};
@@ -1723,9 +1836,14 @@
                 let currentFrontM = frontM;
                 let effectiveBackM = backM;
                 
+                // Base Setbacks (Without Review Lines) for comparison
+                let baseFrontM = frontM;
+                let baseBackM = backM;
+                
                 // Arcade handling
                 if (floorCount === 0 && arcadeM > 0) {
                      currentFrontM = Math.max(currentFrontM, arcadeM);
+                     baseFrontM = Math.max(baseFrontM, arcadeM);
                 }
 
                 if (isConstraintMode) {
@@ -1738,7 +1856,6 @@
                          const reqFrontWL = (checkZ / 5.0) - (roadW_M / 2);
                          if (reqFrontWL > currentFrontM) currentFrontM = reqFrontWL;
                      }
-
                 }
 
                 if ((isConstraintMode || showCheckLines) && byRatio > 0) {
@@ -1750,6 +1867,10 @@
                 let floorPolygon = null;
                 let floorPolygonArea = 0;
                 
+                // Calculate Static Polygon (Before Review Cuts) for Unused Area display
+                let staticPolygon = null;
+                let staticArea = 0;
+                
                 // --- Box Mode Calculation Variables ---
                 let boxWidthM = 0;
                 let boxDepthM = 0;
@@ -1758,7 +1879,7 @@
 
                 if (normalizedData.points) {
                     // Polygon Mode
-                    // Always re-calculate if constraints are active or setbacks differ
+                    // 1. Calculate Actual Floor (Dynamic)
                     if (isConstraintMode || (showCheckLines && byRatio > 0) || currentFrontM > frontM || effectiveBackM > backM || (floorCount === 0 && arcadeM > 0)) {
                          const res = offsetPolygon(normalizedData.points, combinedEdgeTypes, { front: currentFrontM, back: effectiveBackM, side: sideM }, effectiveFrontIndices, normalizedData.curves);
                          floorPolygon = res ? res.points : null;
@@ -1766,15 +1887,31 @@
                          floorPolygon = oneFFootprint; // Reuse 1F if no change
                     }
                     floorPolygonArea = floorPolygon ? calculatePolygonArea(floorPolygon) : 0;
+                    
+                    // 2. Calculate Static Floor (Base Constraints Only)
+                    if (currentFrontM > baseFrontM || effectiveBackM > baseBackM) {
+                        const staticRes = offsetPolygon(normalizedData.points, combinedEdgeTypes, { front: baseFrontM, back: baseBackM, side: sideM }, effectiveFrontIndices, normalizedData.curves);
+                        staticPolygon = staticRes ? staticRes.points : null;
+                        staticArea = staticPolygon ? calculatePolygonArea(staticPolygon) : 0;
+                    } else {
+                        staticPolygon = floorPolygon;
+                        staticArea = floorPolygonArea;
+                    }
                 } else {
                     // Box Mode
+                    // Dynamic
                     boxWidthM = Math.max(0, baseWidthM - sideM);
                     boxDepthM = Math.max(0, baseDepthM - currentFrontM - effectiveBackM);
                     floorPolygonArea = boxWidthM * boxDepthM;
 
+                    // Static
+                    const staticDepthM = Math.max(0, baseDepthM - baseFrontM - baseBackM);
+                    staticArea = boxWidthM * staticDepthM;
+                    // We don't have points for Box Mode easily without generating rects, 
+                    // but BuildingLayer handles box mode via width/depth.
+                    // We can pass `staticDepth` to layer.
+
                     // Calculate Shift for Box (Relative to Center)
-                    // If Back Setback (BackM) increases, we assume it cuts from the 'Back' (Top, -Y)
-                    // Center moves towards 'Front' (Bottom, +Y).
                     shiftY_M = (effectiveBackM - currentFrontM) / 2;
                     
                     // X Shift: Based on Side Direction
@@ -1784,7 +1921,9 @@
                 
                 const coverageLimit = parseFloat(res.maxBuildingArea) || 0;
                 const maxFloorAreaM2 = coverageLimit > 0 ? Math.min(floorPolygonArea, coverageLimit) : floorPolygonArea; 
-                if (maxFloorAreaM2 <= 0.01 && !settings.manualDim && !settings.manualArea) break; 
+                
+                // Task 2: Do not generate tiny fragments (Unused Area rule)
+                if (maxFloorAreaM2 <= 3.0 && !settings.manualDim && !settings.manualArea) break; 
                 
                 let visualWidthM = boxWidthM;
                 let visualDepthM = boxDepthM;
@@ -1862,33 +2001,103 @@
                 }
 
                 const violations = []; 
-                layers.push({
-                    id: floorId, 
-                    z: currentZM * scale, 
-                    height: h * scale, 
-                    
-                    widthPx: visualWidthM * scale,
-                    depthPx: visualDepthM * scale,
-                    
-                    shiftX: finalShiftX,
-                    shiftYPx: finalShiftYPx,
-                    
-                    rotation: rotation, 
-                    pivot: settings.pivot, 
-                    realArea: usedAreaM2, 
-                    realWidth: visualWidthM, 
-                    realDepth: visualDepthM, 
-                    realHeight: h, 
-                    maxGeometricArea: maxFloorAreaM2, 
-                    isViolation: violations.length>0, 
-                    violations: violations, 
-                    points: layerPoints, 
-                    curves: layerCurves
-                });
-                remainingAreaM2 -= usedAreaM2; currentTotalUsed += usedAreaM2; currentZM += h; floorCount++;
+                
+                // Task 3: Unit Division Support
+                let splitUnits = null;
+                let isAutoSplit = false;
+
+                if (unitSettings?.enabled && floorPolygon) {
+                     // Auto-split using unitSettings
+                     // floorPolygon is already relative to centroid if normalizedData is used
+                     splitUnits = splitPolygon(floorPolygon, unitSettings.axis, unitSettings.ratio, unitSettings.gap);
+                     isAutoSplit = true;
+                } else if (settings.units && settings.units.length > 0) {
+                     // Manual units
+                     splitUnits = settings.units;
+                }
+
+                if (splitUnits && splitUnits.length > 0) {
+                    splitUnits.forEach((uPts, uIdx) => {
+                         // Normalize if needed (assuming MANUAL units are stored in World Coords)
+                         let finalUPts = uPts;
+                         if (!isAutoSplit && normalizedData.centroid) {
+                             const c = normalizedData.centroid;
+                             finalUPts = uPts.map(p => ({ x: p.x - c.x, y: p.y - c.y }));
+                         }
+                         
+                         const uArea = calculatePolygonArea(finalUPts);
+                         const uUsed = Math.min(uArea, remainingAreaM2); // Cap by FAR
+                         
+                         layers.push({
+                             id: `${floorId}-${String.fromCharCode(65+uIdx)}`, // A, B, C...
+                             z: currentZM * scale,
+                             height: h * scale,
+                             widthPx: visualWidthM * scale, 
+                             depthPx: visualDepthM * scale,
+                             shiftX: finalShiftX,
+                             shiftYPx: finalShiftYPx,
+                             rotation: rotation,
+                             pivot: settings.pivot,
+                             realArea: uUsed,
+                             realWidth: visualWidthM, // Approx
+                             realDepth: visualDepthM, // Approx
+                             realHeight: h,
+                             maxGeometricArea: uArea,
+                             isViolation: violations.length > 0,
+                             violations: violations,
+                             points: finalUPts,
+                             curves: null, // Curves not supported in split yet
+                             staticPoints: null, // Manual mode implies no auto-ghosting
+                             unusedReviewArea: 0
+                         });
+                         remainingAreaM2 -= uUsed;
+                         currentTotalUsed += uUsed;
+                    });
+                } else {
+                    layers.push({
+                        id: floorId, 
+                        z: currentZM * scale, 
+                        height: h * scale, 
+                        
+                        widthPx: visualWidthM * scale,
+                        depthPx: visualDepthM * scale,
+                        
+                        shiftX: finalShiftX,
+                        shiftYPx: finalShiftYPx,
+                        
+                        rotation: rotation, 
+                        pivot: settings.pivot, 
+                        realArea: usedAreaM2, 
+                        realWidth: visualWidthM, 
+                        realDepth: visualDepthM, 
+                        realHeight: h, 
+                        maxGeometricArea: maxFloorAreaM2, 
+                        isViolation: violations.length>0, 
+                        violations: violations, 
+                        points: layerPoints, 
+                        curves: layerCurves,
+                        
+                        // Task 2 Data
+                        staticPoints: staticPolygon,
+                        unusedReviewArea: Math.max(0, staticArea - floorPolygonArea)
+                    });
+                    remainingAreaM2 -= usedAreaM2; currentTotalUsed += usedAreaM2;
+                }
+                currentZM += h; floorCount++;
             }
             return { layers, totalFloors: floorCount, totalHeight: currentZM, currentTotalUsed, remainingArea: Math.max(0, remainingAreaM2) };
-        }, [res.totalCFA, res.exemptBasement, activeBasementArea, baseDepthM, baseWidthM, frontM, backM, sideM, roadW_M, inputs.floorHeight1F, inputs.floorHeightOther, showCheckLines, showWeiLao, byRatio, scale, floorSettings, arcadeM, isConstraintMode, manualFloorsOverride, normalizedData, edgeTypes, frontageIndices, res.floorsAbove, inputs.roads, inputs.minBackyardDepthRatio, sideDir]); 
+        }, [res.totalCFA, res.exemptBasement, activeBasementArea, baseDepthM, baseWidthM, frontM, backM, sideM, roadW_M, inputs.floorHeight1F, inputs.floorHeightOther, showCheckLines, showWeiLao, byRatio, scale, floorSettings, arcadeM, isConstraintMode, manualFloorsOverride, normalizedData, edgeTypes, frontageIndices, res.floorsAbove, inputs.roads, inputs.minBackyardDepthRatio, sideDir, unitSettings]); 
+
+          const handleAddFloor = () => { 
+    if (massingLayers.currentTotalUsed >= res.totalCFA) {
+        alert("已達最大允建總樓地板面積 (Total CFA) 上限，無法新增樓層。");
+        return;
+    }
+              setManualFloorsOverride((prev) => (prev !== null ? prev : massingLayers.totalFloors) + 1); 
+          };
+        const handleRemoveFloor = () => { const newFloorsAbove = Math.max(1, (manualFloorsOverride !== null ? manualFloorsOverride : massingLayers.totalFloors) - 1); setManualFloorsOverride(newFloorsAbove); onUpdateInputs('floorsAbove', newFloorsAbove); if (selectedFloor && !['base', 'excavation'].includes(selectedFloor.id)) { const floorNum = parseInt(selectedFloor.id); if (!isNaN(floorNum) && floorNum > newFloorsAbove) { setSelectedFloor(null); } } };
+
+        useEffect(() => { if (selectedFloor) { const layer = massingLayers.layers.find(l => l.id === selectedFloor.id); if (layer) { setSelectedFloor({ ...layer, rotation: floorSettings[layer.id]?.rotation || 0, pivot: floorSettings[layer.id]?.pivot || { x: 0, y: 0 }, alignment: floorSettings[layer.id]?.alignment || { x: 'left', y: 'back' }, violations: layer.violations, points: floorSettings[layer.id]?.points || null, curves: floorSettings[layer.id]?.curves || null }); } } }, [floorSettings, isConstraintMode]);
 
         const floorLayers = massingLayers.layers;
         const colors = { bg: isDarkMode ? "#0f172a" : "#fafaf9", grid: isDarkMode ? "linear-gradient(#1e293b 1px, transparent 1px), linear-gradient(90deg, #1e293b 1px, transparent 1px)" : "linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)", floor: showCheckLines ? (isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 255, 255, 0.3)") : (isDarkMode ? "rgba(255, 255, 255, 0.9)" : "#ffffff"), stroke: showCheckLines ? "#fb923c" : (isDarkMode ? "#94a3b8" : "#a8a29e") };
@@ -2252,77 +2461,41 @@
              const paths = [];
              const labels = [];
              
+             // SIMPLIFIED LOGIC: No complex intersections, just connect corresponding points
              const edgePolys = normalizedPoints.map(() => ({ start: [], end: [] }));
 
              for (let i = 0; i < normalizedPoints.length; i++) {
+                 const p = normalizedPoints[i];
+                 const ip = alignedInnerPoints[i];
                  const prevIdx = (i - 1 + normalizedPoints.length) % normalizedPoints.length;
-                 const currIdx = i;
                  
-                 const pCorner = normalizedPoints[i];
-                 const ipCorner = alignedInnerPoints[i];
-                 
-                 const origIdx = edgeMap[i];
-                 const prevOrigIdx = edgeMap[prevIdx];
-                 
-                 const prevPrio = getPriority(prevOrigIdx);
-                 const currPrio = getPriority(origIdx);
-                 
-                 const isRealCorner = origIdx !== prevOrigIdx;
-
-                 if (isRealCorner && prevPrio > currPrio) {
-                     const l1p1 = alignedInnerPoints[prevIdx];
-                     const l1p2 = alignedInnerPoints[i];
-                     const l2p1 = normalizedPoints[i];
-                     const l2p2 = normalizedPoints[(i + 1) % normalizedPoints.length];
-                     
-                     const intersect = getLineIntersection(l1p1, l1p2, l2p1, l2p2);
-                     if (intersect) {
-                         edgePolys[prevIdx].end = [pCorner, intersect, ipCorner];
-                         edgePolys[currIdx].start = [intersect, ipCorner];
-                     } else {
-                        edgePolys[prevIdx].end = [pCorner, ipCorner];
-                        edgePolys[currIdx].start = [pCorner, ipCorner];
-                     }
-                 } else if (isRealCorner && prevPrio < currPrio) {
-                     const l1p1 = alignedInnerPoints[i];
-                     const l1p2 = alignedInnerPoints[(i + 1) % alignedInnerPoints.length];
-                     const l2p1 = normalizedPoints[prevIdx];
-                     const l2p2 = normalizedPoints[i];
-                     
-                     const intersect = getLineIntersection(l1p1, l1p2, l2p1, l2p2);
-                     if (intersect) {
-                         edgePolys[prevIdx].end = [intersect, ipCorner];
-                         edgePolys[currIdx].start = [intersect, pCorner, ipCorner];
-                     } else {
-                        edgePolys[prevIdx].end = [pCorner, ipCorner];
-                        edgePolys[currIdx].start = [pCorner, ipCorner];
-                     }
-                 } else {
-                     edgePolys[prevIdx].end = [pCorner, ipCorner];
-                     edgePolys[currIdx].start = [pCorner, ipCorner];
-                 }
+                 // Assign start/end for the quads
+                 // Edge[prevIdx] ends at i (using point i as the end of the segment started at prevIdx)
+                 edgePolys[prevIdx].end = [p, ip];
+                 // Edge[i] starts at i
+                 edgePolys[i].start = [p, ip];
              }
              
              for (let i = 0; i < normalizedPoints.length; i++) {
                  const originalIdx = edgeMap[i];
                  
-                 let color = "rgba(59, 130, 246, 0.2)"; 
+                 let color = "rgba(59, 130, 246, 0.3)"; 
                  let label = "側院";
                  let textColor = isDarkMode ? "text-blue-300" : "text-blue-600";
                  let depth = 0;
                  
                  if (frontIndices.has(originalIdx)) {
-                    color = "rgba(244, 63, 94, 0.2)"; 
+                    color = "rgba(244, 63, 94, 0.4)"; 
                     label = arcadeM > 0 ? "騎樓" : "前院";
                     depth = arcadeM > 0 ? arcadeM : frontM;
                     textColor = isDarkMode ? "text-rose-300" : "text-rose-600";
                 } else if (combinedEdgeTypes && combinedEdgeTypes[originalIdx] === 'back') {
-                    color = "rgba(16, 185, 129, 0.2)"; 
+                    color = "rgba(16, 185, 129, 0.4)"; 
                     label = "後院";
                     depth = backM;
                     textColor = isDarkMode ? "text-emerald-300" : "text-emerald-600";
                 } else if (combinedEdgeTypes && combinedEdgeTypes[originalIdx] === 'side') {
-                    color = "rgba(59, 130, 246, 0.2)"; 
+                    color = "rgba(59, 130, 246, 0.4)"; 
                     label = "側院";
                     depth = sideM;
                     textColor = isDarkMode ? "text-blue-300" : "text-blue-600";
@@ -2333,17 +2506,28 @@
                  const starts = edgePolys[i].start;
                  const ends = edgePolys[i].end;
                  
+                 if (!starts.length || !ends.length) continue;
+
+                 // Draw Quad: OuterStart -> OuterEnd -> InnerEnd -> InnerStart -> Close
+                 // starts[0] = OuterStart, starts[1] = InnerStart
+                 // ends[0] = OuterEnd, ends[1] = InnerEnd
+                 
                  let d = `M ${starts[0].x*scale + w/2} ${starts[0].y*scale + d/2}`;
-                 for (let k = 1; k < ends.length; k++) {
+                 
+                 // Line to OuterEnd (ends[0]) and then InnerEnd (ends[1])
+                 for (let k = 0; k < ends.length; k++) {
                      d += ` L ${ends[k].x*scale + w/2} ${ends[k].y*scale + d/2}`;
                  }
+                 
+                 // Line to InnerStart (starts[1])
                  for (let k = starts.length - 1; k > 0; k--) {
                      d += ` L ${starts[k].x*scale + w/2} ${starts[k].y*scale + d/2}`;
                  }
+                 
                  d += " Z";
                  
                  paths.push(
-                    <path key={`setback-area-${i}`} d={d} fill={color} stroke="none" fillRule="evenodd" />
+                    <path key={`setback-area-${i}`} d={d} fill={color} stroke={isDarkMode ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.2)"} strokeWidth="1" fillRule="evenodd" />
                  );
              }
              
@@ -2686,7 +2870,7 @@
                   </div>
                   {isConstraintMode && viewMode === '3d' && (<div className="absolute bottom-24 right-6 z-20 pointer-events-none"><div className="bg-emerald-600/90 text-white px-3 py-1.5 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 backdrop-blur border border-emerald-400 animate-pulse"><CheckCircle2 size={16} fill="white" className="text-emerald-700" />鎖定編輯 (法規檢討中)</div></div>)}
                   {viewMode === '2d' ? (
-                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id === 'base' || id === 'excavation') { setSelectedFloor({ id }); } else if (id) { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} onClose={() => { if (selectedFloor) { setSelectedFloor(null); } else { setViewMode('3d'); } }} basePoints={basePoints} baseCurves={baseCurves} excavationPoints={excavationPoints} excavationCurves={excavationCurves} onAddRoad={onUpdateRoads} frontageIndices={frontageIndices} onUpdateFrontageIndices={setFrontageIndices} onAddFloor={handleAddFloor} onRemoveFloor={handleRemoveFloor} edgeTypes={edgeTypes} onUpdateEdgeTypes={updateEdgeTypes} view={view2D} onUpdateView={setView2D} onUpdateInputs={onUpdateInputs} onUpdateRoads={onUpdateRoads} onEditEnd={handleBaseEditEnd} />
+                      <PlanAnalysis2D layers={floorLayers} baseWidthM={baseWidthM} baseDepthM={baseDepthM} onSelectFloor={(id) => { if (id === 'base' || id === 'excavation') { setSelectedFloor({ id }); } else if (id) { const l = floorLayers.find(f => f.id === id); if (l) handleLayerClick({ stopPropagation: () => {} }, l); } }} selectedFloorId={selectedFloor?.id} isDarkMode={isDarkMode} onUpdateSetting={updateFloorSetting} floorSettings={floorSettings} inputs={inputs} scale3d={scale} basements={basements} onToggleBasement={toggleBasement} activeBasementArea={activeBasementArea} totalAllowedArea={res.totalCFA} showCheckLines={showCheckLines} volumeLimit={volumeLimit} parkingOn1F={parkingOn1F} onToggleParkingLocation={toggleParkingLocation} onClose={() => { if (selectedFloor) { setSelectedFloor(null); } else { setViewMode('3d'); } }} basePoints={basePoints} baseCurves={baseCurves} excavationPoints={excavationPoints} excavationCurves={excavationCurves} onAddRoad={onUpdateRoads} frontageIndices={frontageIndices} onUpdateFrontageIndices={setFrontageIndices} onAddFloor={handleAddFloor} onRemoveFloor={handleRemoveFloor} edgeTypes={edgeTypes} onUpdateEdgeTypes={updateEdgeTypes} view={view2D} onUpdateView={setView2D} onUpdateInputs={onUpdateInputs} onUpdateRoads={onUpdateRoads} onEditEnd={handleBaseEditEnd} unitSettings={unitSettings} onUpdateUnitSettings={setUnitSettings} />
                   ) : (
                       <>
                           {!isConstraintMode && <FloorInfoCard data={selectedFloor} isDarkMode={isDarkMode} onReset={resetFloor} isConstraintMode={isConstraintMode} inputs={inputs}/>}
@@ -2705,7 +2889,7 @@
                               </div>
                           )}
                           <div className="relative w-full h-full flex items-center justify-center pointer-events-none" style={{ perspective: '2500px', transformStyle: 'preserve-3d' }}>
-                            <div style={{ transform: `rotateX(${viewAngleX}deg) rotateZ(${rotationZ}deg)`, transformStyle: 'preserve-3d', transition: viewTransition }}>
+                            <div style={{ transform: `scale(${zoom}) rotateX(${viewAngleX}deg) rotateZ(${rotationZ}deg)`, transformStyle: 'preserve-3d', transition: viewTransition }}>
                                <div style={{ position: 'relative', width: `${w}px`, height: `${d}px`, backgroundColor: 'transparent', transformStyle: 'preserve-3d', transition: 'background-color 0.5s', pointerEvents: 'auto' }} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart}>
                                   {/* Base Layer with Stroke */}
                                   <div className="absolute inset-0" style={{ width: '100%', height: '100%' }}>

@@ -1242,66 +1242,84 @@
               }
           });
 
-          const vizResolvedEdgeTypes = useMemo(() => {
-              const combined = { ...vizCombinedEdgeTypes };
-              const sideDepth = parseFloat(inputs.sideYardDepth || 0);
-              if (selectedFloorId !== 'base' || sideDepth <= 0) return combined;
-              if (Object.values(combined).includes('side')) return combined;
-              const pts = currentBasePoints;
-              if (!pts || pts.length < 3) return combined;
-              const discretized = discretizePolygon(pts, baseCurves, 20);
-              const densePoints = discretized.points;
-              const edgeMap = discretized.edgeMap;
-              if (!densePoints || densePoints.length < 3) return combined;
-              const centroid = getPolygonCentroid(densePoints);
-              let fx = 0;
-              let fy = 0;
-              let count = 0;
-              densePoints.forEach((p, i) => {
-                  const origIdx = edgeMap[i];
-                  if (!vizFrontIndices.has(origIdx)) return;
-                  const p2 = densePoints[(i + 1) % densePoints.length];
-                  const n = getSegmentNormal(p, p2, centroid);
-                  fx += n.x;
-                  fy += n.y;
-                  count++;
-              });
-              if (count <= 0) return combined;
-              const fLen = Math.hypot(fx, fy);
-              if (fLen <= 0) return combined;
-              fx /= fLen;
-              fy /= fLen;
-              const desiredSign = (inputs.sideYardDirection || 'right') === 'left' ? 1 : -1;
-              const candidates = [];
-              densePoints.forEach((p, i) => {
-                  const origIdx = edgeMap[i];
-                  if (vizFrontIndices.has(origIdx) || combined[origIdx]) return;
-                  const p2 = densePoints[(i + 1) % densePoints.length];
-                  const n = getSegmentNormal(p, p2, centroid);
-                  const dot = n.x * fx + n.y * fy;
-                  const cross = fx * n.y - fy * n.x;
-                  candidates.push({ origIdx, dot, cross });
-              });
-              let selected = candidates.filter(c => Math.abs(c.dot) < 0.3 && desiredSign * c.cross > 0);
-              if (selected.length === 0) {
-                  selected = candidates.filter(c => desiredSign * c.cross > 0).sort((a, b) => Math.abs(a.dot) - Math.abs(b.dot));
-              }
-              selected.forEach(c => { combined[c.origIdx] = 'side'; });
-              return combined;
-          }, [selectedFloorId, currentBasePoints, baseCurves, vizCombinedEdgeTypes, vizFrontIndices, inputs.sideYardDepth, inputs.sideYardDirection]);
+          // Calculate Setback Polygon for Visualization
+          const setbackPoly = useMemo(() => {
+              // Always use currentBasePoints (which is either explicit or default rect) for visualization
+              const pts = selectedFloorId === 'base' ? currentBasePoints : basePoints;
 
+              if (selectedFloorId === 'base' && pts) {
+                  const front = parseFloat(inputs.frontYardDepth || 0);
+                  const back = parseFloat(inputs.backYardDepth || 0);
+                  const side = parseFloat(inputs.sideYardDepth || 0);
+                  const res = offsetPolygon(pts, vizCombinedEdgeTypes, { front, back, side }, vizFrontIndices, baseCurves);
+                  return res ? res.points : null;
+              }
+              return null;
+          }, [selectedFloorId, basePoints, currentBasePoints, baseCurves, vizCombinedEdgeTypes, vizFrontIndices, inputs.frontYardDepth, inputs.backYardDepth, inputs.sideYardDepth]);
+          // ------------------------------------------
+          
           const regionRects = useMemo(() => {
-              if (selectedFloorId !== 'base') return [];
-              const pts = currentBasePoints;
-              if (!pts || pts.length < 3) return [];
+              if (selectedFloorId !== 'base' || !currentBasePoints || currentBasePoints.length < 3) return [];
+              const { points: densePoints, edgeMap } = discretizePolygon(currentBasePoints, baseCurves, 15);
+              if (!densePoints || densePoints.length < 2) return [];
+              const centroid = getPolygonCentroid(densePoints);
               const frontDepth = parseFloat(inputs.frontYardDepth || 0);
               const backDepth = parseFloat(inputs.backYardDepth || 0);
               const sideDepth = parseFloat(inputs.sideYardDepth || 0);
-              const discretized = discretizePolygon(pts, baseCurves, 20);
-              const densePoints = discretized.points;
-              const edgeMap = discretized.edgeMap;
-              if (!densePoints || densePoints.length < 2) return [];
-              const centroid = getPolygonCentroid(densePoints);
+              const combinedEdgeTypes = { ...vizCombinedEdgeTypes };
+              const hasExplicitBack = Object.values(combinedEdgeTypes).includes('back');
+              const hasExplicitSide = Object.values(combinedEdgeTypes).includes('side');
+              let frontNormal = { x: 0, y: 0 };
+              let frontCount = 0;
+              densePoints.forEach((p, i) => {
+                  const origIdx = edgeMap[i];
+                  if (vizFrontIndices.has(origIdx)) {
+                      const p2 = densePoints[(i + 1) % densePoints.length];
+                      const n = getSegmentNormal(p, p2, centroid);
+                      frontNormal.x += n.x;
+                      frontNormal.y += n.y;
+                      frontCount++;
+                  }
+              });
+              if (frontCount > 0) {
+                  const len = Math.hypot(frontNormal.x, frontNormal.y);
+                  if (len > 0) { frontNormal.x /= len; frontNormal.y /= len; }
+                  if (!hasExplicitBack) {
+                      densePoints.forEach((p, i) => {
+                          const origIdx = edgeMap[i];
+                          if (vizFrontIndices.has(origIdx) || combinedEdgeTypes[origIdx]) return;
+                          const p2 = densePoints[(i + 1) % densePoints.length];
+                          const n = getSegmentNormal(p, p2, centroid);
+                          const dot = n.x * frontNormal.x + n.y * frontNormal.y;
+                          if (dot < -0.5) combinedEdgeTypes[origIdx] = 'back';
+                      });
+                  }
+                  if (!hasExplicitSide && sideDepth > 0) {
+                      const desiredSign = (inputs.sideYardDirection || 'right') === 'left' ? 1 : -1;
+                      const candidates = [];
+                      densePoints.forEach((p, i) => {
+                          const origIdx = edgeMap[i];
+                          if (vizFrontIndices.has(origIdx) || combinedEdgeTypes[origIdx]) return;
+                          const p2 = densePoints[(i + 1) % densePoints.length];
+                          const n = getSegmentNormal(p, p2, centroid);
+                          const dot = n.x * frontNormal.x + n.y * frontNormal.y;
+                          const cross = frontNormal.x * n.y - frontNormal.y * n.x;
+                          candidates.push({ origIdx, dot, cross });
+                      });
+                      let selected = candidates.filter(c => Math.abs(c.dot) < 0.3 && desiredSign * c.cross > 0);
+                      if (selected.length === 0) {
+                          selected = candidates.filter(c => desiredSign * c.cross > 0).sort((a, b) => Math.abs(a.dot) - Math.abs(b.dot));
+                      }
+                      selected.forEach(c => { combinedEdgeTypes[c.origIdx] = 'side'; });
+                  }
+              }
+              if (sideDepth > 0 && !Object.values(combinedEdgeTypes).includes('side')) {
+                  for (let idx = 0; idx < currentBasePoints.length; idx++) {
+                      if (!vizFrontIndices.has(idx) && !combinedEdgeTypes[idx]) {
+                          combinedEdgeTypes[idx] = 'side';
+                      }
+                  }
+              }
               const rects = [];
               for (let i = 0; i < densePoints.length; i++) {
                   const p1 = densePoints[i];
@@ -1312,44 +1330,32 @@
                   if (vizFrontIndices.has(origIdx)) {
                       regionType = 'front';
                       depth = frontDepth;
-                  } else if (vizResolvedEdgeTypes[origIdx] === 'back') {
+                  } else if (combinedEdgeTypes[origIdx] === 'back') {
                       regionType = 'back';
                       depth = backDepth;
-                  } else if (vizResolvedEdgeTypes[origIdx] === 'side') {
+                  } else if (combinedEdgeTypes[origIdx] === 'side') {
                       regionType = 'side';
                       depth = sideDepth;
+                  } else {
+                      continue;
                   }
-                  if (!regionType || depth <= 0) continue;
-                  const dx = p2.x - p1.x;
-                  const dy = p2.y - p1.y;
-                  const segLen = Math.hypot(dx, dy);
-                  if (segLen <= 0) continue;
-                  const normal = getSegmentNormal(p1, p2, centroid);
-                  const midX = (p1.x + p2.x) / 2;
-                  const midY = (p1.y + p2.y) / 2;
-                  const centerX = midX + normal.x * (depth / 2);
-                  const centerY = midY + normal.y * (depth / 2);
-                  const rotation = (Math.atan2(dy, dx) * 180) / Math.PI;
-                  rects.push({ x: centerX, y: centerY, w: segLen, h: depth, rotation, regionType, edgeIndex: origIdx });
+                  if (depth <= 0) continue;
+                  const length = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                  if (length <= 0) continue;
+                  const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+                  const n = getSegmentNormal(p1, p2, centroid);
+                  rects.push({
+                      x: mid.x + n.x * depth / 2,
+                      y: mid.y + n.y * depth / 2,
+                      w: length,
+                      h: depth,
+                      rotation: Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI,
+                      regionType,
+                      edgeIndex: origIdx
+                  });
               }
               return rects;
-          }, [selectedFloorId, currentBasePoints, baseCurves, vizFrontIndices, vizResolvedEdgeTypes, inputs.frontYardDepth, inputs.backYardDepth, inputs.sideYardDepth, inputs.sideYardDirection]);
-
-          // Calculate Setback Polygon for Visualization
-          const setbackPoly = useMemo(() => {
-              // Always use currentBasePoints (which is either explicit or default rect) for visualization
-              const pts = selectedFloorId === 'base' ? currentBasePoints : basePoints;
-
-              if (selectedFloorId === 'base' && pts) {
-                  const front = parseFloat(inputs.frontYardDepth || 0);
-                  const back = parseFloat(inputs.backYardDepth || 0);
-                  const side = parseFloat(inputs.sideYardDepth || 0);
-                  const res = offsetPolygon(pts, vizResolvedEdgeTypes, { front, back, side }, vizFrontIndices, baseCurves);
-                  return res ? res.points : null;
-              }
-              return null;
-          }, [selectedFloorId, basePoints, currentBasePoints, baseCurves, vizResolvedEdgeTypes, vizFrontIndices, inputs.frontYardDepth, inputs.backYardDepth, inputs.sideYardDepth]);
-          // ------------------------------------------
+          }, [selectedFloorId, currentBasePoints, baseCurves, vizFrontIndices, vizCombinedEdgeTypes, inputs.frontYardDepth, inputs.backYardDepth, inputs.sideYardDepth, inputs.sideYardDirection]);
           
           return (
               <div className="w-full h-full flex flex-col relative overflow-hidden bg-stone-50" ref={containerRef} onPointerDown={(e) => { e.stopPropagation(); handlePanStart(e); }} onClick={(e) => e.stopPropagation()}>
@@ -1477,33 +1483,28 @@
                                   {selectedFloorId !== 'excavation' && selectedFloorId !== 'base' && excavationPoints && ( <path d={generateSvgPath(excavationPoints, excavationCurves, scale)} fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="4,4" opacity="0.5"/> )}
                                  <g transform={`translate(${xPos}, ${yPos}) rotate(${displayLayer.rotation || 0})`} className="cursor-move" onPointerDown={handleDragStart} onPointerMove={handleDragMove} onPointerUp={handleDragEnd}>
                                     {selectedFloorId === 'base' && regionRects.length > 0 && (
-                                      <g pointerEvents="none">
-                                        {regionRects.map((rect, idx) => {
-                                            const isBackMode = interactionMode === 'set_back';
-                                            const isSideMode = interactionMode === 'set_side';
-                                            let opacity = 0.18;
-                                            if (isBackMode) opacity = rect.regionType === 'back' ? 0.32 : 0.06;
-                                            else if (isSideMode) opacity = rect.regionType === 'side' ? 0.32 : 0.06;
-                                            const colorMap = rect.regionType === 'front' ? { fill: "#ef4444", stroke: "#ef4444", label: "前院" }
-                                              : rect.regionType === 'back' ? { fill: "#10b981", stroke: "#10b981", label: "後院" }
-                                              : { fill: "#3b82f6", stroke: "#3b82f6", label: "側院" };
-                                            const labelOpacity = Math.min(1, opacity + 0.2);
-                                            return (
-                                              <g key={`region-${idx}-${rect.edgeIndex}`} transform={`translate(${rect.x * scale}, ${rect.y * scale}) rotate(${rect.rotation})`}>
-                                                <rect x={-(rect.w * scale)/2} y={-(rect.h * scale)/2} width={rect.w * scale} height={rect.h * scale} fill={colorMap.fill} fillOpacity={opacity} stroke={colorMap.stroke} strokeWidth="1" />
-                                                <text x="0" y="0" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={colorMap.stroke} opacity={labelOpacity}>{colorMap.label}</text>
-                                              </g>
-                                            );
-                                        })}
-                                      </g>
-                                    )}
-                                     {selectedFloorId === 'base' && setbackPoly && setbackPoly.length > 0 && (
-                                        <path
-                                            d={generateSvgPath(setbackPoly, null, scale)}
-                                            fill="rgba(59, 130, 246, 0.15)"
-                                            stroke="none"
-                                            opacity="0.8"
-                                        />
+                                        <g pointerEvents="none">
+                                            {regionRects.map((rect, idx) => {
+                                                const isBackMode = interactionMode === 'set_back';
+                                                const isSideMode = interactionMode === 'set_side';
+                                                let opacity = 0.18;
+                                                if (isBackMode) opacity = rect.regionType === 'back' ? 0.32 : 0.06;
+                                                else if (isSideMode) opacity = rect.regionType === 'side' ? 0.32 : 0.06;
+                                                const colorMap = rect.regionType === 'front'
+                                                    ? { fill: "#ef4444", stroke: "#ef4444", label: "前院" }
+                                                    : rect.regionType === 'back'
+                                                        ? { fill: "#10b981", stroke: "#10b981", label: "後院" }
+                                                        : { fill: "#3b82f6", stroke: "#3b82f6", label: "側院" };
+                                                return (
+                                                    <g key={`region-${idx}-${rect.edgeIndex}`} transform={`translate(${rect.x * scale}, ${rect.y * scale}) rotate(${rect.rotation})`}>
+                                                        <rect x={-(rect.w * scale) / 2} y={-(rect.h * scale) / 2} width={rect.w * scale} height={rect.h * scale} fill={colorMap.fill} fillOpacity={opacity} stroke={colorMap.stroke} strokeWidth="1" />
+                                                        <text x="0" y="0" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={colorMap.stroke} opacity={Math.min(1, opacity + 0.5)} className="select-none">
+                                                            {colorMap.label}
+                                                        </text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </g>
                                     )}
                                       {displayLayer.points ? (
                                           <>
@@ -1517,7 +1518,7 @@
                                               {displayLayer.points.map((p, i) => {
                                                   const nextI = (i + 1) % displayLayer.points.length; const nextP = displayLayer.points[nextI]; const isLocked = lockedEdgeIndices.has(i); const curve = displayLayer.curves?.[i];
                                                   const isFrontage = selectedFloorId === 'base' && vizFrontIndices.has(i);
-                                                  const isBack = selectedFloorId === 'base' && vizResolvedEdgeTypes[i] === 'back'; const isSide = selectedFloorId === 'base' && vizResolvedEdgeTypes[i] === 'side';
+                                                  const isBack = selectedFloorId === 'base' && vizCombinedEdgeTypes[i] === 'back'; const isSide = selectedFloorId === 'base' && vizCombinedEdgeTypes[i] === 'side';
                                                   let strokeColor = (isLocked ? "#ef4444" : "transparent"); if (isFrontage) strokeColor = "#ef4444"; else if (isBack) strokeColor = "#10b981"; else if (isSide) strokeColor = "#3b82f6";
                                                   const strokeWidth = (isFrontage || isBack || isSide) ? "4" : (isLocked ? "3" : "15"); const opacity = (isFrontage || isBack || isSide) ? 0.8 : 1;
                                                   let edgeD = `M ${p.x * scale} ${p.y * scale}`; if (curve) { edgeD += ` Q ${curve.x * scale} ${curve.y * scale}, ${nextP.x * scale} ${nextP.y * scale}`; } else { edgeD += ` L ${nextP.x * scale} ${nextP.y * scale}`; }
@@ -2126,11 +2127,9 @@
             
             const inputFloorsAbove = parseFloat(inputs.floorsAbove || 0);
             const targetFloorsAbove = manualFloorsOverride !== null ? manualFloorsOverride : (inputFloorsAbove > 0 ? inputFloorsAbove : res.floorsAbove);
-            const safeTargetFloorsAbove = Number.isFinite(targetFloorsAbove) ? targetFloorsAbove : 0;
-            const perFloorAreaM2 = safeTargetFloorsAbove > 0 ? (availableForSuperstructure / safeTargetFloorsAbove) : 0;
-            const fullFloorsAbove = Math.floor(safeTargetFloorsAbove);
-            const fractionalFloorsAbove = safeTargetFloorsAbove - fullFloorsAbove;
-            const maxSimulatedFloors = Math.min(Math.ceil(safeTargetFloorsAbove), 100);
+            const fullFloorsTarget = Math.floor(targetFloorsAbove);
+            const fractionalFloorRatio = Math.max(0, targetFloorsAbove - fullFloorsTarget);
+            const maxSimulatedFloors = Math.min(targetFloorsAbove, 100);
             const buildBackM = backM;
             const buildFrontM = baseDepthM - frontM;
             const buildWidthM = Math.max(0, baseWidthM - sideM);
@@ -2374,11 +2373,9 @@
                     usedAreaM2 = settings.area; 
                 } 
                 else { 
-                    let perFloorAreaCap = perFloorAreaM2;
-                    if (fractionalFloorsAbove > 0 && floorCount >= fullFloorsAbove) {
-                        perFloorAreaCap = perFloorAreaM2 * fractionalFloorsAbove;
-                    }
-                    usedAreaM2 = Math.min(remainingAreaM2, maxFloorAreaM2, perFloorAreaCap);
+                    const isFractionalFloor = fractionalFloorRatio > 0 && floorCount === fullFloorsTarget;
+                    const perFloorAreaCap = isFractionalFloor ? maxFloorAreaM2 * fractionalFloorRatio : maxFloorAreaM2;
+                    usedAreaM2 = Math.min(remainingAreaM2, perFloorAreaCap);
                 }
                 
                 if (isConstraintMode) {
@@ -2946,55 +2943,64 @@
                     }
                 }
             }
-            if (sideM > 0) {
-                for (let idx = 0; idx < edgeCount; idx++) {
-                    if (!frontIndices.has(idx) && !combinedEdgeTypes[idx]) {
-                        combinedEdgeTypes[idx] = 'side';
-                    }
+            const centroid = getPolygonCentroid(normalizedPoints);
+            const getDepthByType = (type) => {
+                if (type === 'front') return arcadeM > 0 ? arcadeM : frontM;
+                if (type === 'back') return backM;
+                if (type === 'side') return sideM;
+                return 0;
+            };
+            const getRegionType = (origIdx) => {
+                if (frontIndices.has(origIdx)) return 'front';
+                if (combinedEdgeTypes[origIdx] === 'back') return 'back';
+                if (combinedEdgeTypes[origIdx] === 'side') return 'side';
+                return null;
+            };
+            const buildOffsetPoints = (activeType) => {
+                const shiftedLines = [];
+                for (let i = 0; i < normalizedPoints.length; i++) {
+                    const p1 = normalizedPoints[i];
+                    const p2 = normalizedPoints[(i + 1) % normalizedPoints.length];
+                    const origIdx = edgeMap[i];
+                    const regionType = getRegionType(origIdx);
+                    const depth = regionType === activeType ? getDepthByType(regionType) : 0;
+                    const n = getSegmentNormal(p1, p2, centroid);
+                    shiftedLines.push({
+                        p1: { x: p1.x + n.x * depth, y: p1.y + n.y * depth },
+                        p2: { x: p2.x + n.x * depth, y: p2.y + n.y * depth }
+                    });
                 }
-            }
-            const offsetResult = offsetPolygon(rawNormalized, combinedEdgeTypes, { front: frontM, back: backM, side: sideM }, frontIndices, normalizedData.curves);
-            if (!offsetResult || !offsetResult.points) return null;
-            let innerPoints = offsetResult.points;
-
-            const getSignedArea = (pts) => {
-                if (!pts || pts.length < 3) return 0;
-                let a = 0;
-                for (let i = 0; i < pts.length; i++) {
-                    const p = pts[i];
-                    const q = pts[(i + 1) % pts.length];
-                    a += (p.x * q.y) - (q.x * p.y);
+                const newPoints = [];
+                for (let i = 0; i < shiftedLines.length; i++) {
+                    const l1 = shiftedLines[i];
+                    const l2 = shiftedLines[(i + 1) % shiftedLines.length];
+                    const intersect = getLineIntersection(l1.p1, l1.p2, l2.p1, l2.p2);
+                    newPoints.push(intersect || l1.p2);
                 }
-                return a * 0.5;
+                return newPoints;
+            };
+            const buildRingPath = (innerPts) => {
+                if (!innerPts || innerPts.length < 3) return null;
+                let dPath = "";
+                normalizedPoints.forEach((p, i) => {
+                    const x = p.x * scale + w / 2;
+                    const y = p.y * scale + d / 2;
+                    if (i === 0) dPath += `M ${x} ${y}`;
+                    else dPath += ` L ${x} ${y}`;
+                });
+                dPath += " Z";
+                const inner = [...innerPts].reverse();
+                inner.forEach((p, i) => {
+                    const x = p.x * scale + w / 2;
+                    const y = p.y * scale + d / 2;
+                    if (i === 0) dPath += ` M ${x} ${y}`;
+                    else dPath += ` L ${x} ${y}`;
+                });
+                dPath += " Z";
+                return dPath;
             };
 
-            const outerArea = getSignedArea(normalizedPoints);
-            const innerArea = getSignedArea(innerPoints);
-
-            if ((outerArea > 0 && innerArea < 0) || (outerArea < 0 && innerArea > 0)) {
-                normalizedPoints.reverse();
-                edgeMap.reverse();
-                innerPoints.reverse();
-            }
-
-            const alignedInnerPoints = innerPoints.map((p, i) => {
-                const x = p?.x; const y = p?.y;
-                if (!isFinite(x) || !isFinite(y) || isNaN(x) || isNaN(y)) {
-                    const fb = normalizedPoints[i];
-                    return { x: (fb?.x ?? 0), y: (fb?.y ?? 0) };
-                }
-                return p;
-            });
-
-             // Priority Helper (uses Original Index)
-             const getPriority = (origIdx) => {
-                 if (frontIndices.has(origIdx)) return 2;
-                 if (combinedEdgeTypes && combinedEdgeTypes[origIdx] === 'back') return 2;
-                 if (combinedEdgeTypes && combinedEdgeTypes[origIdx] === 'side') return 1;
-                 return 0;
-             };
-             
-             const paths = [];
+            const paths = [];
              const hatchPalette = {
                  front: {
                      base: isDarkMode ? "rgba(244, 63, 94, 0.22)" : "rgba(244, 63, 94, 0.18)",
@@ -3010,117 +3016,79 @@
                  }
              };
              const hatchSize = Math.max(6, Math.min(16, scale * 0.8));
-
-             const edgePolys = normalizedPoints.map(() => ({ start: [], end: [] }));
-
-             for (let i = 0; i < normalizedPoints.length; i++) {
-                 const prevIdx = (i - 1 + normalizedPoints.length) % normalizedPoints.length;
-                 const currIdx = i;
-                 
-                 const pCorner = normalizedPoints[i];
-                 const ipCorner = alignedInnerPoints[i];
-                 
-                 const origIdx = edgeMap[i];
-                 const prevOrigIdx = edgeMap[prevIdx];
-                 
-                 const prevPrio = getPriority(prevOrigIdx);
-                 const currPrio = getPriority(origIdx);
-                 
-                 const isRealCorner = origIdx !== prevOrigIdx;
-
-                 if (isRealCorner && prevPrio > currPrio) {
-                     const l1p1 = alignedInnerPoints[prevIdx];
-                     const l1p2 = alignedInnerPoints[i];
-                     const l2p1 = normalizedPoints[i];
-                     const l2p2 = normalizedPoints[(i + 1) % normalizedPoints.length];
-                     
-                     const intersect = getLineIntersection(l1p1, l1p2, l2p1, l2p2);
-                     if (intersect) {
-                         edgePolys[prevIdx].end = [pCorner, intersect, ipCorner];
-                         edgePolys[currIdx].start = [intersect, ipCorner];
-                     } else {
-                        edgePolys[prevIdx].end = [pCorner, ipCorner];
-                        edgePolys[currIdx].start = [pCorner, ipCorner];
-                     }
-                 } else if (isRealCorner && prevPrio < currPrio) {
-                     const l1p1 = alignedInnerPoints[i];
-                     const l1p2 = alignedInnerPoints[(i + 1) % alignedInnerPoints.length];
-                     const l2p1 = normalizedPoints[prevIdx];
-                     const l2p2 = normalizedPoints[i];
-                     
-                     const intersect = getLineIntersection(l1p1, l1p2, l2p1, l2p2);
-                     if (intersect) {
-                         edgePolys[prevIdx].end = [intersect, ipCorner];
-                         edgePolys[currIdx].start = [intersect, pCorner, ipCorner];
-                     } else {
-                        edgePolys[prevIdx].end = [pCorner, ipCorner];
-                        edgePolys[currIdx].start = [pCorner, ipCorner];
-                     }
-                 } else {
-                     edgePolys[prevIdx].end = [pCorner, ipCorner];
-                     edgePolys[currIdx].start = [pCorner, ipCorner];
-                 }
-             }
-
-             for (let i = 0; i < normalizedPoints.length; i++) {
-                 const originalIdx = edgeMap[i];
-
-                let fillId = "setback-side-hatch";
-                 let segDepth = 0;
-                 
-                 if (frontIndices.has(originalIdx)) {
-                    fillId = "setback-front-hatch";
-                    segDepth = arcadeM > 0 ? arcadeM : frontM;
-                } else if (combinedEdgeTypes && combinedEdgeTypes[originalIdx] === 'back') {
-                    fillId = "setback-back-hatch";
-                    segDepth = backM;
-                } else if (combinedEdgeTypes && combinedEdgeTypes[originalIdx] === 'side') {
-                    fillId = "setback-side-hatch";
-                    segDepth = sideM;
-                } else {
-                    continue;
+            const regionTypes = ['front', 'back', 'side'];
+            const fillIds = { front: 'setback-front-hatch', back: 'setback-back-hatch', side: 'setback-side-hatch' };
+            regionTypes.forEach(type => {
+                const depth = getDepthByType(type);
+                if (depth <= 0) return;
+                let hasEdge = false;
+                for (let i = 0; i < edgeMap.length; i++) {
+                    if (getRegionType(edgeMap[i]) === type) { hasEdge = true; break; }
                 }
-                 
-                 if (segDepth <= 0) continue;
+                if (!hasEdge) return;
+                const innerPts = buildOffsetPoints(type);
+                const dPath = buildRingPath(innerPts);
+                if (!dPath) return;
+                paths.push(
+                    <path key={`setback-area-${type}`} d={dPath} fill={`url(#${fillIds[type]})`} stroke="none" fillRule="evenodd" />
+                );
+            });
 
-                 const starts = edgePolys[i].start;
-                 const ends = edgePolys[i].end;
-                 
-                 let d = `M ${starts[0].x*scale + w/2} ${starts[0].y*scale + d/2}`;
-                 for (let k = 1; k < ends.length; k++) {
-                     d += ` L ${ends[k].x*scale + w/2} ${ends[k].y*scale + d/2}`;
-                 }
-                 for (let k = starts.length - 1; k > 0; k--) {
-                     d += ` L ${starts[k].x*scale + w/2} ${starts[k].y*scale + d/2}`;
-                 }
-                 d += " Z";
-                 
-               paths.push(
-                   <path key={`setback-area-${i}`} d={d} fill={`url(#${fillId})`} stroke="none" fillRule="evenodd" />
-               );
+            const labels = [];
+            const colorByType = { front: "#f43f5e", back: "#10b981", side: "#3b82f6" };
+            const labelByType = { front: arcadeM > 0 ? "騎樓" : "前院", back: "後院", side: "側院" };
+            const segmentsByOrig = new globalThis.Map();
+            for (let i = 0; i < edgeMap.length; i++) {
+                const orig = edgeMap[i];
+                if (!segmentsByOrig.has(orig)) segmentsByOrig.set(orig, []);
+                segmentsByOrig.get(orig).push(i);
             }
+            segmentsByOrig.forEach((segments, origIdx) => {
+                const regionType = getRegionType(origIdx);
+                if (!regionType) return;
+                const depth = getDepthByType(regionType);
+                if (depth <= 0) return;
+                const midSeg = segments[Math.floor(segments.length / 2)];
+                const p1 = normalizedPoints[midSeg];
+                const p2 = normalizedPoints[(midSeg + 1) % normalizedPoints.length];
+                if (!p1 || !p2) return;
+                const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+                const n = getSegmentNormal(p1, p2, centroid);
+                labels.push({
+                    x: mid.x + n.x * depth * 0.5,
+                    y: mid.y + n.y * depth * 0.5,
+                    text: labelByType[regionType],
+                    color: colorByType[regionType],
+                    key: `${regionType}-${origIdx}`
+                });
+            });
 
-             return (
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
-                      <svg width="100%" height="100%" viewBox={`0 0 ${w} ${d}`} style={{overflow: 'visible'}}>
-                           <defs>
-                               <pattern id="setback-front-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                                   <rect width={hatchSize} height={hatchSize} fill={hatchPalette.front.base} />
-                                   <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.front.stripe} />
-                               </pattern>
-                               <pattern id="setback-back-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                                   <rect width={hatchSize} height={hatchSize} fill={hatchPalette.back.base} />
-                                   <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.back.stripe} />
-                               </pattern>
-                               <pattern id="setback-side-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                                   <rect width={hatchSize} height={hatchSize} fill={hatchPalette.side.base} />
-                                   <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.side.stripe} />
-                               </pattern>
-                           </defs>
-                           {paths}
-                      </svg>
-                  </div>
-             );
+            return (
+                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
+                     <svg width="100%" height="100%" viewBox={`0 0 ${w} ${d}`} style={{overflow: 'visible'}}>
+                          <defs>
+                              <pattern id="setback-front-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                  <rect width={hatchSize} height={hatchSize} fill={hatchPalette.front.base} />
+                                  <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.front.stripe} />
+                              </pattern>
+                              <pattern id="setback-back-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                  <rect width={hatchSize} height={hatchSize} fill={hatchPalette.back.base} />
+                                  <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.back.stripe} />
+                              </pattern>
+                              <pattern id="setback-side-hatch" x="0" y="0" width={hatchSize} height={hatchSize} patternUnits="userSpaceOnUse" patternContentUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                  <rect width={hatchSize} height={hatchSize} fill={hatchPalette.side.base} />
+                                  <rect width={hatchSize / 2} height={hatchSize} fill={hatchPalette.side.stripe} />
+                              </pattern>
+                          </defs>
+                          {paths}
+                          {labels.map(label => (
+                              <text key={label.key} x={label.x * scale + w / 2} y={label.y * scale + d / 2} textAnchor="middle" dominantBaseline="middle" fontSize="10" fill={label.color} opacity={0.9} className="select-none">
+                                  {label.text}
+                              </text>
+                          ))}
+                     </svg>
+                 </div>
+            );
         };
 
         const calculateCheckLines = () => {
@@ -3390,7 +3358,68 @@
                                          <div className={`w-full h-full border-2 shadow-2xl transition-colors duration-500 ${isDarkMode ? 'bg-slate-800/80 border-slate-600' : 'bg-white/90 border-stone-300'}`} style={{ boxShadow: isDarkMode ? '0 0 20px rgba(0,0,0,0.5)' : 'none' }}></div>
                                      )}
                                   </div>
-                                     {!basePoints && ( <> <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${backPx}px`, background: isDarkMode ? 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 10px, rgba(16, 185, 129, 0.2) 10px, rgba(16, 185, 129, 0.2) 20px)' : 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 10px, rgba(16, 185, 129, 0.2) 10px, rgba(16, 185, 129, 0.2) 20px)', borderBottom: '2px dashed #10b981', pointerEvents: 'none' }}> <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-600/80 tracking-widest whitespace-nowrap bg-white/50 px-1 rounded backdrop-blur-sm">後院</div> </div> <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: `${Math.max(frontPx, (arcadeM * scale) || 0)}px`, background: isDarkMode ? 'repeating-linear-gradient(45deg, rgba(244, 63, 94, 0.1), rgba(244, 63, 94, 0.1) 10px, rgba(244, 63, 94, 0.2) 10px, rgba(244, 63, 94, 0.2) 20px)' : 'repeating-linear-gradient(45deg, rgba(244, 63, 94, 0.1), rgba(244, 63, 94, 0.1) 10px, rgba(244, 63, 94, 0.2) 10px, rgba(244, 63, 94, 0.2) 20px)', borderTop: '2px dashed #f43f5e', pointerEvents: 'none' }}> <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-rose-600/80 tracking-widest whitespace-nowrap bg-white/50 px-1 rounded backdrop-blur-sm">{arcadeM > 0 ? "騎樓" : "前院"}</div> </div> </> )}
+                                     {!basePoints && (
+                                       <>
+                                         <div
+                                           style={{
+                                             position: 'absolute',
+                                             top: 0,
+                                             left: 0,
+                                             width: '100%',
+                                             height: `${backPx}px`,
+                                             background: isDarkMode
+                                               ? 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 10px, rgba(16, 185, 129, 0.2) 10px, rgba(16, 185, 129, 0.2) 20px)'
+                                               : 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 10px, rgba(16, 185, 129, 0.2) 10px, rgba(16, 185, 129, 0.2) 20px)',
+                                             borderBottom: '2px dashed #10b981',
+                                             pointerEvents: 'none'
+                                           }}
+                                         >
+                                           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-600/80 tracking-widest whitespace-nowrap bg-white/50 px-1 rounded backdrop-blur-sm">
+                                             後院
+                                           </div>
+                                         </div>
+                                         <div
+                                           style={{
+                                             position: 'absolute',
+                                             bottom: 0,
+                                             left: 0,
+                                             width: '100%',
+                                             height: `${Math.max(frontPx, (arcadeM * scale) || 0)}px`,
+                                             background: isDarkMode
+                                               ? 'repeating-linear-gradient(45deg, rgba(244, 63, 94, 0.1), rgba(244, 63, 94, 0.1) 10px, rgba(244, 63, 94, 0.2) 10px, rgba(244, 63, 94, 0.2) 20px)'
+                                               : 'repeating-linear-gradient(45deg, rgba(244, 63, 94, 0.1), rgba(244, 63, 94, 0.1) 10px, rgba(244, 63, 94, 0.2) 10px, rgba(244, 63, 94, 0.2) 20px)',
+                                             borderTop: '2px dashed #f43f5e',
+                                             pointerEvents: 'none'
+                                           }}
+                                         >
+                                           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-rose-600/80 tracking-widest whitespace-nowrap bg-white/50 px-1 rounded backdrop-blur-sm">
+                                             {arcadeM > 0 ? '騎樓' : '前院'}
+                                           </div>
+                                         </div>
+                                         {sidePx > 0 && (
+                                           <div
+                                             style={{
+                                               position: 'absolute',
+                                               top: 0,
+                                               left: sideDir === 'left' ? 0 : 'auto',
+                                               right: sideDir === 'right' ? 0 : 'auto',
+                                               width: `${sidePx}px`,
+                                               height: '100%',
+                                               background: isDarkMode
+                                                 ? 'repeating-linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1) 10px, rgba(59, 130, 246, 0.2) 10px, rgba(59, 130, 246, 0.2) 20px)'
+                                                 : 'repeating-linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1) 10px, rgba(59, 130, 246, 0.2) 10px, rgba(59, 130, 246, 0.2) 20px)',
+                                               borderLeft: sideDir === 'left' ? '2px dashed #3b82f6' : 'none',
+                                               borderRight: sideDir === 'right' ? '2px dashed #3b82f6' : 'none',
+                                               pointerEvents: 'none'
+                                             }}
+                                           >
+                                             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-sky-600/80 tracking-widest whitespace-nowrap bg-white/50 px-1 rounded backdrop-blur-sm">
+                                               側院
+                                             </div>
+                                           </div>
+                                         )}
+                                       </>
+                                     )}
                                   </div>
                                   {renderRoads()} {renderPolygonSetbacks()}
                                   {calculateCheckLines().map(line => (

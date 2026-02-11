@@ -194,6 +194,94 @@
           }
           return { points: newPoints, curves: newCurves };
       };
+      
+      const pointInPolygon = (pt, poly) => {
+          let inside = false;
+          for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+              const xi = poly[i].x, yi = poly[i].y;
+              const xj = poly[j].x, yj = poly[j].y;
+              const intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / ((yj - yi) || 1e-12) + xi);
+              if (intersect) inside = !inside;
+          }
+          return inside;
+      };
+      
+      const allInsidePolygon = (points, container) => {
+          if (!points || !container || points.length === 0 || container.length < 3) return false;
+          for (let i = 0; i < points.length; i++) {
+              if (!pointInPolygon(points[i], container)) return false;
+          }
+          return true;
+      };
+
+      const polygonSignedArea = (points) => {
+          if (!points || points.length < 3) return 0;
+          let area = 0;
+          for (let i = 0; i < points.length; i++) {
+              const j = (i + 1) % points.length;
+              area += points[i].x * points[j].y - points[j].x * points[i].y;
+          }
+          return area / 2;
+      };
+
+      const clipPolygonByPolygon = (subject, clip) => {
+          if (!subject || subject.length < 3 || !clip || clip.length < 3) return subject;
+          let output = subject;
+          const clipArea = polygonSignedArea(clip);
+          const isCCW = clipArea >= 0;
+          const inside = (p, a, b) => {
+              const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+              return isCCW ? cross >= -1e-9 : cross <= 1e-9;
+          };
+          const intersection = (s, e, a, b) => {
+              const dx1 = e.x - s.x;
+              const dy1 = e.y - s.y;
+              const dx2 = b.x - a.x;
+              const dy2 = b.y - a.y;
+              const denom = dx1 * dy2 - dy1 * dx2;
+              if (Math.abs(denom) < 1e-12) return e;
+              const t = ((a.x - s.x) * dy2 - (a.y - s.y) * dx2) / denom;
+              return { x: s.x + t * dx1, y: s.y + t * dy1 };
+          };
+          for (let i = 0; i < clip.length; i++) {
+              const a = clip[i];
+              const b = clip[(i + 1) % clip.length];
+              const input = output;
+              output = [];
+              for (let j = 0; j < input.length; j++) {
+                  const s = input[j];
+                  const e = input[(j + 1) % input.length];
+                  const eInside = inside(e, a, b);
+                  const sInside = inside(s, a, b);
+                  if (eInside) {
+                      if (!sInside) output.push(intersection(s, e, a, b));
+                      output.push(e);
+                  } else if (sInside) {
+                      output.push(intersection(s, e, a, b));
+                  }
+              }
+              if (output.length === 0) return null;
+          }
+          return output;
+      };
+      
+      const fitPolygonWithin = (points, curves, container) => {
+          if (!points || !container) return { points, curves };
+          if (allInsidePolygon(points, container)) return { points, curves };
+          let lo = 0.1, hi = 1.0;
+          let best = { points, curves };
+          const centroid = getPolygonCentroid(points);
+          for (let iter = 0; iter < 14; iter++) {
+              const mid = (lo + hi) / 2;
+              const scaled = scalePolygon(points, curves, mid, centroid);
+              if (allInsidePolygon(scaled.points, container)) {
+                  best = scaled; lo = mid;
+              } else {
+                  hi = mid;
+              }
+          }
+          return best;
+      };
 
       const getSegmentNormal = (p1, p2, centroid) => {
           const dx = p2.x - p1.x;
@@ -935,6 +1023,8 @@
               const d = baseDepthM;
               return [{x: -w/2, y: -d/2}, {x: w/2, y: -d/2}, {x: w/2, y: d/2}, {x: -w/2, y: d/2}];
           }, [baseWidthM, baseDepthM]);
+          const [showFloorDialog, setShowFloorDialog] = useState(false);
+          const [floorConfig, setFloorConfig] = useState({ above: Math.max(1, parseInt(floorsAboveValue || '1')), below: Math.max(0, parseInt(inputs.floorsBelow || '0')) });
 
           // Use default points if explicit basePoints are null, to prevent 3D state change
           const currentBasePoints = basePoints || defaultBasePts;
@@ -1552,25 +1642,16 @@
                   {!displayLayer && (
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-2">
                        <div className="flex bg-white shadow rounded-full border border-stone-200 overflow-hidden items-center">
-                           <button onClick={onRemoveFloor} className="px-1 py-0.5 text-[8px] font-semibold hover:bg-stone-50 border-r flex items-center"><MinusCircle size={10}/></button>
-                           <span className="px-1 py-0.5 text-[8px] font-semibold text-stone-600">地上層</span>
-                           <button onClick={onAddFloor} className="px-1 py-0.5 text-[8px] font-semibold hover:bg-stone-50 border-l flex items-center"><Plus size={10}/></button>
-                        </div>
-                        <div className="flex bg-white shadow rounded-full border border-stone-200 overflow-hidden items-center">
-                           <button onClick={() => onUpdateInputs('floorsBelow', Math.max(0, inputs.floorsBelow - 1))} className="px-1 py-0.5 text-[8px] font-semibold hover:bg-stone-50 border-r flex items-center"><MinusCircle size={10}/></button>
-                           <span className="px-1 py-0.5 text-[8px] font-semibold text-stone-600">地下層</span>
-                           <button onClick={() => onUpdateInputs('floorsBelow', inputs.floorsBelow + 1)} className="px-1 py-0.5 text-[8px] font-semibold hover:bg-stone-50 border-l flex items-center"><Plus size={10}/></button>
-                        </div>
-                       <div className="flex items-center gap-2 bg-white shadow rounded-full border border-stone-200 px-1 py-0.5">
-                           <span className="text-[8px] text-stone-400 font-semibold">樓層配置</span>
-                           <div className="flex items-center gap-1">
-                               <span className="text-[8px] text-stone-400">地上</span>
-                              <input type="number" min="1" value={floorsAboveValue} onChange={(e)=>onUpdateFloorsAbove && onUpdateFloorsAbove(parseFloat(e.target.value || '1'))} className="w-8 text-[8px] text-right border border-stone-200 rounded px-1 py-0.5" />
-                            </div>
-                            <div className="flex items-center gap-1">
-                               <span className="text-[8px] text-stone-400">地下</span>
-                               <input type="number" min="0" value={inputs.floorsBelow} onChange={(e)=>onUpdateInputs('floorsBelow', Math.max(0, parseInt(e.target.value || '0')))} className="w-8 text-[8px] text-right border border-stone-200 rounded px-1 py-0.5" />
-                            </div>
+                          <button
+                              onClick={() => {
+                                  setFloorConfig({ above: Math.max(1, parseInt(floorsAboveValue || '1')), below: Math.max(0, parseInt(inputs.floorsBelow || '0')) });
+                                  setShowFloorDialog(true);
+                              }}
+                              className="px-2 py-0.5 text-[10px] font-bold text-stone-600 hover:bg-stone-50 flex items-center gap-1"
+                              title="樓層配置">
+                              <Layers size={12}/>
+                              <span className="ml-1">樓層配置</span>
+                          </button>
                         </div>
                         <div className="flex bg-white shadow rounded-full border border-stone-200 overflow-hidden items-center">
                             <button
@@ -1585,6 +1666,36 @@
                             </button>
                         </div>
                     </div>
+                  )}
+                  {showFloorDialog && (
+                      <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/30" onClick={() => setShowFloorDialog(false)}></div>
+                          <div className="relative bg-white rounded-lg shadow-xl border border-stone-200 w-64 p-3">
+                              <h3 className="font-bold text-sm mb-2">樓層配置</h3>
+                              <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                      <span className="text-xs text-stone-500">地上樓層數</span>
+                                      <input type="number" min="1" value={floorConfig.above} onChange={(e) => setFloorConfig(fc => ({ ...fc, above: Math.max(1, parseInt(e.target.value || '1')) }))} className="w-16 text-xs p-1 text-right border rounded" />
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                      <span className="text-xs text-stone-500">地下層數</span>
+                                      <input type="number" min="0" value={floorConfig.below} onChange={(e) => setFloorConfig(fc => ({ ...fc, below: Math.max(0, parseInt(e.target.value || '0')) }))} className="w-16 text-xs p-1 text-right border rounded" />
+                                  </div>
+                              </div>
+                              <div className="mt-3 flex gap-2">
+                                  <button
+                                      onClick={() => {
+                                          onUpdateFloorsAbove && onUpdateFloorsAbove(floorConfig.above);
+                                          onUpdateInputs && onUpdateInputs('floorsBelow', floorConfig.below);
+                                          setShowFloorDialog(false);
+                                      }}
+                                      className="flex-1 bg-indigo-600 text-white text-xs py-1.5 rounded hover:bg-indigo-700">
+                                      確認
+                                  </button>
+                                  <button onClick={() => setShowFloorDialog(false)} className="flex-1 bg-white border border-stone-300 text-stone-600 text-xs py-1.5 rounded hover:bg-stone-50">取消</button>
+                              </div>
+                          </div>
+                      </div>
                   )}
                   {unitSettings?.enabled && !displayLayer && (
                       <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-white p-4 rounded shadow-lg border border-stone-200 w-72">
@@ -2483,12 +2594,19 @@
             }
             // -----------------------------------------------------------
 
-            // Initial 1F Footprint (using static setbacks)
+            const oneFFrontM = arcadeM > 0 ? Math.max(frontM, arcadeM) : frontM;
             let oneFFootprint = null;
             if (normalizedData.points) { 
-                const res = offsetPolygon(normalizedData.points, combinedEdgeTypes, { front: frontM, back: backM, side: sideM }, effectiveFrontIndices, normalizedData.curves); 
+                const res = offsetPolygon(normalizedData.points, combinedEdgeTypes, { front: oneFFrontM, back: backM, side: sideM }, effectiveFrontIndices, normalizedData.curves); 
                 oneFFootprint = res ? res.points : null;
             }
+            const oneFFootprintArea = oneFFootprint ? calculatePolygonArea(oneFFootprint) : 0;
+            const projectionBoxWidthM = Math.max(0, baseWidthM - sideM);
+            const projectionBoxDepthM = Math.max(0, baseDepthM - oneFFrontM - backM);
+            const projectionBoxArea = projectionBoxWidthM * projectionBoxDepthM;
+            const shouldClampToProjection = isConstraintMode || (showCheckLines && (showHeightRatio || showWeiLao || showBackyard));
+            const projectionAreaLimit = normalizedData.points ? oneFFootprintArea : projectionBoxArea;
+            let firstFloorFinalArea = null;
 
             // Fix: Strict Area/Floor limit check to avoid generating unused residual areas
             while ((remainingAreaM2 > 0.1 || floorCount < targetFloorsAbove) && floorCount < maxSimulatedFloors) {
@@ -2514,12 +2632,11 @@
                      baseFrontM = Math.max(baseFrontM, arcadeM);
                 }
 
-                if (isConstraintMode) {
-                     // 1. Height Ratio (Front)
-                     const reqFrontHR = (checkZ / 3.6) - roadW_M;
-                     if (reqFrontHR > currentFrontM) currentFrontM = reqFrontHR;
-
-                     // 2. Wei Lao (Front) - if active
+                if (isConstraintMode || showCheckLines) {
+                     if (showHeightRatio && byRatio <= 0) {
+                         const reqFrontHR = (checkZ / 3.6) - roadW_M;
+                         if (reqFrontHR > currentFrontM) currentFrontM = reqFrontHR;
+                     }
                      if (showWeiLao) {
                          const reqFrontWL = (checkZ / 5.0) - (roadW_M / 2);
                          if (reqFrontWL > currentFrontM) currentFrontM = reqFrontWL;
@@ -2574,16 +2691,26 @@
                         staticPolygon = floorPolygon;
                         staticArea = floorPolygonArea;
                     }
+                    if (shouldClampToProjection && oneFFootprint) {
+                        staticPolygon = oneFFootprint;
+                        staticArea = oneFFootprintArea;
+                    }
                 } else {
                     // Box Mode
                     // Dynamic
                     boxWidthM = Math.max(0, baseWidthM - sideM);
                     boxDepthM = Math.max(0, baseDepthM - currentFrontM - effectiveBackM);
+                    if (shouldClampToProjection && projectionBoxDepthM > 0 && boxDepthM > projectionBoxDepthM) {
+                        boxDepthM = projectionBoxDepthM;
+                    }
                     floorPolygonArea = boxWidthM * boxDepthM;
 
                     // Static
                     const staticDepthM = Math.max(0, baseDepthM - baseFrontM - baseBackM);
                     staticArea = boxWidthM * staticDepthM;
+                    if (shouldClampToProjection && projectionBoxArea > 0) {
+                        staticArea = projectionBoxArea;
+                    }
                     // We don't have points for Box Mode easily without generating rects, 
                     // but BuildingLayer handles box mode via width/depth.
                     // We can pass `staticDepth` to layer.
@@ -2596,8 +2723,23 @@
                     else if (sideDir === 'right') shiftX_M = -sideM / 2;
                 }
                 
+                let allowedPolygon = floorPolygon;
+                if (staticPolygon && allowedPolygon) {
+                    allowedPolygon = clipPolygonByPolygon(staticPolygon, allowedPolygon);
+                }
+                if (floorCount > 0 && firstFloorFinalArea && allowedPolygon) {
+                    allowedPolygon = clipPolygonByPolygon(allowedPolygon, firstFloorFinalArea);
+                }
+                if (allowedPolygon !== floorPolygon) {
+                    floorPolygon = allowedPolygon;
+                    floorPolygonArea = floorPolygon ? calculatePolygonArea(floorPolygon) : 0;
+                }
+
                 const coverageLimit = parseFloat(res.maxBuildingArea) || 0;
-                const maxFloorAreaM2 = coverageLimit > 0 ? Math.min(floorPolygonArea, coverageLimit) : floorPolygonArea; 
+                let maxFloorAreaM2 = coverageLimit > 0 ? Math.min(floorPolygonArea, coverageLimit) : floorPolygonArea; 
+                if (shouldClampToProjection && projectionAreaLimit > 0) {
+                    maxFloorAreaM2 = Math.min(maxFloorAreaM2, projectionAreaLimit);
+                }
                 
                 // Task 2: Do not generate tiny fragments (Unused Area rule)
                 if (maxFloorAreaM2 <= 3.0 && !settings.manualDim && !settings.manualArea) break; 
@@ -2607,6 +2749,8 @@
                 let rotation = settings.rotation || 0;
                 let usedAreaM2 = 0;
 
+                const useEvenArea = manualFloorsOverride !== null && targetFloorsAbove > 0;
+                const evenAreaPerFloor = useEvenArea ? (availableForSuperstructure / targetFloorsAbove) : null;
                 // Determine Area Usage
                 if (settings.manualDim && settings.width !== undefined && settings.depth !== undefined) { 
                     visualWidthM = settings.width; visualDepthM = settings.depth; usedAreaM2 = visualWidthM * visualDepthM; 
@@ -2615,11 +2759,20 @@
                     usedAreaM2 = settings.area; 
                 } 
                 else { 
-                    const isFractionalFloor = fractionalFloorRatio > 0 && floorCount === fullFloorsTarget;
-                    const perFloorAreaCap = isFractionalFloor ? maxFloorAreaM2 * fractionalFloorRatio : maxFloorAreaM2;
-                    usedAreaM2 = Math.min(remainingAreaM2, perFloorAreaCap);
+                    if (useEvenArea && Number.isFinite(evenAreaPerFloor)) {
+                        const perFloorAreaCap = Math.min(maxFloorAreaM2, evenAreaPerFloor);
+                        usedAreaM2 = Math.min(remainingAreaM2, perFloorAreaCap);
+                    } else {
+                        const isFractionalFloor = fractionalFloorRatio > 0 && floorCount === fullFloorsTarget;
+                        const perFloorAreaCap = isFractionalFloor ? maxFloorAreaM2 * fractionalFloorRatio : maxFloorAreaM2;
+                        usedAreaM2 = Math.min(remainingAreaM2, perFloorAreaCap);
+                    }
                 }
                 
+                if (shouldClampToProjection && projectionAreaLimit > 0) {
+                    usedAreaM2 = Math.min(usedAreaM2, projectionAreaLimit);
+                }
+
                 if (isConstraintMode) {
                      usedAreaM2 = Math.min(usedAreaM2, maxFloorAreaM2);
                 }
@@ -2640,6 +2793,13 @@
                          layerCurves = newC;
                      }
                 }
+                
+                if (layerPoints && shouldClampToProjection && oneFFootprint) {
+                    const fitted = fitPolygonWithin(layerPoints, layerCurves, oneFFootprint);
+                    layerPoints = fitted.points;
+                    layerCurves = fitted.curves;
+                    usedAreaM2 = Math.min(usedAreaM2, calculatePolygonArea(layerPoints));
+                }
 
                 if (!layerPoints && floorPolygon) {
                     layerPoints = floorPolygon;
@@ -2651,12 +2811,42 @@
                          layerPoints = newPts;
                          layerCurves = newCurves;
                     }
+                    if (shouldClampToProjection && oneFFootprint) {
+                        const fitted = fitPolygonWithin(layerPoints, layerCurves, oneFFootprint);
+                        layerPoints = fitted.points;
+                        layerCurves = fitted.curves;
+                        const clampedArea = calculatePolygonArea(layerPoints);
+                        usedAreaM2 = Math.min(usedAreaM2, clampedArea);
+                    }
                 } else if (!layerPoints && !normalizedData.points) {
                     // Box Mode Scaling (if using less than max area)
                     const usageRatio = maxFloorAreaM2 > 0 ? usedAreaM2 / maxFloorAreaM2 : 0; 
                     const scaleFactor = Math.sqrt(usageRatio); 
                     visualWidthM = boxWidthM * scaleFactor; 
                     visualDepthM = boxDepthM * scaleFactor;
+                    const visualArea = visualWidthM * visualDepthM;
+                    if (shouldClampToProjection && projectionAreaLimit > 0 && visualArea > projectionAreaLimit + 0.01) {
+                        const scaleRate = Math.sqrt(projectionAreaLimit / visualArea);
+                        visualWidthM *= scaleRate;
+                        visualDepthM *= scaleRate;
+                        usedAreaM2 = Math.min(usedAreaM2, projectionAreaLimit);
+                    }
+                }
+
+                if (layerPoints && allowedPolygon) {
+                    if (!allInsidePolygon(layerPoints, allowedPolygon)) {
+                        layerPoints = clipPolygonByPolygon(layerPoints, allowedPolygon);
+                        layerCurves = null;
+                    }
+                    if (layerPoints) {
+                        usedAreaM2 = Math.min(usedAreaM2, calculatePolygonArea(layerPoints));
+                    } else {
+                        usedAreaM2 = 0;
+                    }
+                }
+
+                if (floorCount === 0 && layerPoints) {
+                    firstFloorFinalArea = layerPoints;
                 }
                 
                 // Manual Offsets (User dragging)
@@ -2750,14 +2940,14 @@
                         
                         // Task 2 Data
                         staticPoints: staticPolygon,
-                        unusedReviewArea: Math.max(0, staticArea - floorPolygonArea)
+                        unusedReviewArea: Math.max(0, staticArea - usedAreaM2)
                     });
                     remainingAreaM2 -= usedAreaM2; currentTotalUsed += usedAreaM2;
                 }
                 currentZM += h; floorCount++;
             }
             return { layers, totalFloors: floorCount, totalHeight: currentZM, currentTotalUsed, remainingArea: Math.max(0, remainingAreaM2) };
-        }, [res.totalCFA, res.exemptBasement, activeBasementArea, baseDepthM, baseWidthM, frontM, backM, sideM, roadW_M, inputs.floorHeight1F, inputs.floorHeightOther, showCheckLines, showWeiLao, byRatio, scale, floorSettings, arcadeM, isConstraintMode, manualFloorsOverride, normalizedData, edgeTypes, frontageIndices, res.floorsAbove, inputs.roads, inputs.minBackyardDepthRatio, sideDir, unitSettings]); 
+        }, [res.totalCFA, res.exemptBasement, activeBasementArea, baseDepthM, baseWidthM, frontM, backM, sideM, roadW_M, inputs.floorHeight1F, inputs.floorHeightOther, showCheckLines, showHeightRatio, showWeiLao, showBackyard, byRatio, scale, floorSettings, arcadeM, isConstraintMode, manualFloorsOverride, normalizedData, edgeTypes, frontageIndices, res.floorsAbove, inputs.roads, inputs.minBackyardDepthRatio, sideDir, unitSettings]); 
 
           const handleAddFloor = () => { 
     if (massingLayers.currentTotalUsed >= res.totalCFA) {
@@ -2772,9 +2962,9 @@
             if (!payload || !payload.area || payload.area <= 0) return;
             const taxableBasementArea = Math.max(0, activeBasementArea - res.exemptBasement);
             const availableForSuperstructure = Math.max(0, res.totalCFA - taxableBasementArea);
+            const targetFloors = Math.max(1, Math.round(manualFloorsOverride !== null ? manualFloorsOverride : (parseFloat(inputs.floorsAbove || 0) || res.floorsAbove || 1)));
             let areaPerFloor = payload.area;
-            if (availableForSuperstructure > 0 && areaPerFloor > availableForSuperstructure) areaPerFloor = availableForSuperstructure;
-            const targetFloors = availableForSuperstructure > 0 ? Math.max(1, Math.floor(availableForSuperstructure / areaPerFloor)) : 1;
+            if (availableForSuperstructure > 0) areaPerFloor = availableForSuperstructure / targetFloors;
             const finalFloors = targetFloors;
             setManualFloorsOverride(finalFloors);
             onUpdateInputs('floorsAbove', finalFloors);
@@ -3424,15 +3614,16 @@
                 return { widthM: parseFloat(road.width) };
             };
             const { widthM: primRoadW_M } = getPrimaryRoadInfo();
-            const fD = parseFloat(inputs.frontYardDepth || 0);
             const minBYRatio = parseFloat(inputs.minBackyardDepthRatio || 0);
+            const showHeightFront = showHeightRatio && minBYRatio <= 0;
+            const fD = parseFloat(inputs.frontYardDepth || 0);
             const vizHeight = 30;
             for (let i = 0; i < workingPoints.length; i++) {
                 const p1 = workingPoints[i];
                 const p2 = workingPoints[(i + 1) % workingPoints.length];
                 const originalIdx = workingEdgeIndices[i];
                 const n = getSegmentNormal(p1, p2, centroid);
-                if (frontIndices.has(originalIdx)) {
+                if (showHeightFront && frontIndices.has(originalIdx)) {
                     const p1Out = { x: p1.x - n.x * primRoadW_M, y: p1.y - n.y * primRoadW_M };
                     const p2Out = { x: p2.x - n.x * primRoadW_M, y: p2.y - n.y * primRoadW_M };
                     const p1In = { x: p1.x + n.x * fD, y: p1.y + n.y * fD };
@@ -3469,13 +3660,13 @@
             const backColor = isDarkMode ? "rgba(34,197,94,0.20)" : "rgba(34,197,94,0.18)";
             let frontPathD = "";
             let backPathD = "";
-            if (showCheckLines && showHeightRatio) {
+            if (showCheckLines && showHeightFront) {
                 for (let gi = 0; gi < groupsFrontOuter.length; gi++) {
                     const dEl = buildRingPath(groupsFrontOuter[gi], groupsFrontInner[gi]);
                     if (dEl) frontPathD += `${dEl} `;
                 }
             }
-            if (showCheckLines && showBackyard) {
+            if (showCheckLines && (showHeightRatio || showBackyard)) {
                 for (let gi = 0; gi < groupsBackOuter.length; gi++) {
                     const dEl = buildRingPath(groupsBackOuter[gi], groupsBackInner[gi]);
                     if (dEl) backPathD += `${dEl} `;
@@ -3613,28 +3804,30 @@
                  const mid = { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 };
                  
                  if (!linesByEdge[originalIdx]) linesByEdge[originalIdx] = [];
+                const minBYRatio = parseFloat(inputs.minBackyardDepthRatio || 0);
+                const useFrontHeightRatio = showHeightRatio && minBYRatio <= 0;
 
-                 // 1. Height Ratio & WeiLao (Frontage)
+                // 1. WeiLao (Frontage)
                  if (frontIndices.has(originalIdx)) {
                      const fD = parseFloat(inputs.frontYardDepth || 0); 
                      
                      const p_out_M = { x: mid.x - normal.x * primRoadW_M, y: mid.y - normal.y * primRoadW_M };
                      const p_center_M = { x: mid.x - normal.x * (primRoadW_M / 2), y: mid.y - normal.y * (primRoadW_M / 2) };
                      const p_setback_M = { x: mid.x + normal.x * fD, y: mid.y + normal.y * fD };
-
-                    if (showCheckLines && showHeightRatio) {
-                         const hRatioH = 3.6 * (primRoadW_M + fD) * scale; 
-                         linesByEdge[originalIdx].push({ 
-                             id: `height-${i}`, 
-                             type: 'height',
-                             start: { x: offX + p_out_M.x * scale, y: offY + p_out_M.y * scale, z: 0 }, 
-                             end: { x: offX + p_setback_M.x * scale, y: offY + p_setback_M.y * scale, z: hRatioH },
-                             label: "高度比", 
-                             color: "#f43f5e",
-                             dashed: false,
-                             thick: true
-                         });
-                     }
+                    
+                   if (showCheckLines && useFrontHeightRatio) {
+                        const hRatioH = 3.6 * (primRoadW_M + fD) * scale; 
+                        linesByEdge[originalIdx].push({ 
+                            id: `height-${i}`, 
+                            type: 'height',
+                            start: { x: offX + p_out_M.x * scale, y: offY + p_out_M.y * scale, z: 0 }, 
+                            end: { x: offX + p_setback_M.x * scale, y: offY + p_setback_M.y * scale, z: hRatioH },
+                            label: "高度比", 
+                            color: "#f43f5e",
+                            dashed: false,
+                            thick: true
+                        });
+                    }
                      
                     if (showCheckLines && showWeiLao) {
                          const wlH = 5 * (0.5 * primRoadW_M + fD) * scale;
@@ -3652,28 +3845,39 @@
                  }
 
                  // 2. Backyard Depth Ratio (Back)
-                 const minBYRatio = parseFloat(inputs.minBackyardDepthRatio || 0);
                  const isBack = combinedEdgeTypes[originalIdx] === 'back' || autoBackIndices.has(originalIdx);
 
-                if (minBYRatio > 0 && showCheckLines && showBackyard && isBack) {
-                     const bD = parseFloat(inputs.backYardDepth || 0); 
-                     
+               if (minBYRatio > 0 && showCheckLines && isBack) {
                      const startM = mid;
                      const vizHeight = 30; 
                      const reqDist = vizHeight / minBYRatio;
                      
                      const p_envelope_M = { x: mid.x + normal.x * reqDist, y: mid.y + normal.y * reqDist };
                      
-                     linesByEdge[originalIdx].push({ 
-                        id: `backyard-${i}`, 
-                        type: 'backyard',
-                        start: { x: offX + startM.x * scale, y: offY + startM.y * scale, z: 0 }, 
-                        end: { x: offX + p_envelope_M.x * scale, y: offY + p_envelope_M.y * scale, z: vizHeight * scale }, 
-                        label: `後院檢討 (1:${minBYRatio})`, 
-                        color: "#22c55e", // Fixed Green
-                        dashed: true,     // Fixed Dashed
-                        thick: true       // Fixed Thick
-                    });
+                    if (showHeightRatio) {
+                        linesByEdge[originalIdx].push({ 
+                           id: `height-${i}`, 
+                           type: 'height',
+                           start: { x: offX + startM.x * scale, y: offY + startM.y * scale, z: 0 }, 
+                           end: { x: offX + p_envelope_M.x * scale, y: offY + p_envelope_M.y * scale, z: vizHeight * scale }, 
+                           label: "高度比", 
+                           color: "#22c55e",
+                           dashed: true,
+                           thick: true
+                       });
+                    }
+                    if (showBackyard) {
+                        linesByEdge[originalIdx].push({ 
+                           id: `backyard-${i}`, 
+                           type: 'backyard',
+                           start: { x: offX + startM.x * scale, y: offY + startM.y * scale, z: 0 }, 
+                           end: { x: offX + p_envelope_M.x * scale, y: offY + p_envelope_M.y * scale, z: vizHeight * scale }, 
+                           label: `後院檢討 (1:${minBYRatio})`, 
+                           color: "#22c55e",
+                           dashed: true,
+                           thick: true
+                       });
+                    }
                  }
              }
              
